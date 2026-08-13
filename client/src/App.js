@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 
 // NOTE: You will change this link to your Render URL during deployment!
-const socket = io('http://localhost:4000');
+const socket = io('https://matchattaxgame.onrender.com');
 
 const FORMATIONS = [
     "3-1-4-2", "3-4-1-2", "3-4-2-1", "3-4-3", "3-4-3 Flat", "3-5-2", "4-1-2-1-2", "4-1-2-1-2 (Narrow)", "4-1-2-1-2 (Wide)", "4-1-3-2", "4-1-4-1", "4-2-2-2", "4-2-3-1 (Narrow)",
