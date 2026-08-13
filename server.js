@@ -152,7 +152,6 @@ io.on('connection', (socket) => {
         const mgrCount = Object.keys(gameState.managers).length;
         if (mgrCount === 0) return;
 
-        // Player count validations according to rulebook
         if (mode.includes("Casual") && mgrCount !== 2) {
             return socket.emit('auctionError', "Casual modes require exactly 2 players!");
         }
@@ -190,10 +189,11 @@ io.on('connection', (socket) => {
         const rawVal = String(playerData.value).replace(/,/g, '');
         const { atk: f_atk, dfc: f_def } = applyBoosts(cardType, playerData.position, age, b_atk, b_def);
 
+        // UPDATED: timeLeft changed to 180 (3 minutes)
         gameState.cardOnBlock = {
             Name: playerData.name, Position: playerData.position, Club: playerData.club,
             CardType: cardType, Attack: f_atk, Defence: f_def, Value: parseInt(rawVal) || 1000000,
-            highestBid: 0, highestBidder: null, timeLeft: 120
+            highestBid: 0, highestBidder: null, timeLeft: 180
         };
         io.emit('updateState', gameState);
 
@@ -228,6 +228,7 @@ io.on('connection', (socket) => {
                 gameState.cardOnBlock.highestBid = bid;
                 gameState.cardOnBlock.highestBidder = mgrName;
                 
+                // This logic still correctly resets the clock to 10s if under 10s!
                 if (gameState.cardOnBlock.timeLeft <= 10) {
                     gameState.cardOnBlock.timeLeft = 10;
                     io.emit('timerTick', 10);
