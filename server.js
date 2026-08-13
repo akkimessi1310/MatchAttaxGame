@@ -31,7 +31,6 @@ let gameState = {
     auctionStatus: "Lobby" 
 };
 
-// Map Socket IDs to Manager Names
 let socketToManager = {};
 let timerInterval;
 
@@ -77,24 +76,33 @@ function applyBoosts(card, pos, age, b_atk, b_def) {
 
 function resolveAuction() {
     const card = gameState.cardOnBlock;
-    if (card && card.highestBidder) {
-        const mgr = gameState.managers[card.highestBidder];
-        mgr.Budget -= card.highestBid;
-        mgr.Roster.push({ ...card, isStarting: false });
-        gameState.soldPlayers.push(card.Name.toLowerCase());
+    if (card) {
+        if (card.highestBidder) {
+            // Player is sold to highest bidder
+            const mgr = gameState.managers[card.highestBidder];
+            mgr.Budget -= card.highestBid;
+            mgr.Roster.push({ ...card, isStarting: false });
+            gameState.soldPlayers.push(card.Name.toLowerCase());
 
-        if (mgr.Budget <= 0) {
-            while (mgr.Roster.length < 11) {
-                mgr.Roster.push({ Name: "Auto-Fill Penalty", Position: "N/A", CardType: "Base Card", Attack: Math.floor(Math.random()*31)+30, Defence: Math.floor(Math.random()*31)+30, isStarting: false });
+            if (mgr.Budget <= 0) {
+                while (mgr.Roster.length < 11) {
+                    mgr.Roster.push({ Name: "Auto-Fill Penalty", Position: "N/A", CardType: "Base Card", Attack: Math.floor(Math.random()*31)+30, Defence: Math.floor(Math.random()*31)+30, isStarting: false });
+                }
+                mgr.Status = mgr.Roster.length === 11 ? "Auction Ended (Auto-filled)" : "Auction Ended (No extra subs)";
+            } else if (mgr.Roster.length >= 18) {
+                mgr.Status = "Auction Ended (Max 18 Players)";
             }
-            mgr.Status = mgr.Roster.length === 11 ? "Auction Ended (Auto-filled)" : "Auction Ended (No extra subs)";
-        } else if (mgr.Roster.length >= 18) {
-            mgr.Status = "Auction Ended (Max 18 Players)";
-        }
 
-        gameState.auctionHistory.push({
-            Player: card.Name, CardType: card.CardType, Rating: `${card.Attack}/${card.Defence}`, BasePrice: card.Value, FinalPrice: card.highestBid, Winner: card.highestBidder
-        });
+            gameState.auctionHistory.push({
+                Player: card.Name, CardType: card.CardType, Rating: `${card.Attack}/${card.Defence}`, BasePrice: card.Value, FinalPrice: card.highestBid, Winner: card.highestBidder
+            });
+        } else {
+            // Player goes UNSOLD
+            gameState.soldPlayers.push(card.Name.toLowerCase()); // Prevents re-entering the same unsold player
+            gameState.auctionHistory.push({
+                Player: card.Name, CardType: card.CardType, Rating: `${card.Attack}/${card.Defence}`, BasePrice: card.Value, FinalPrice: 0, Winner: "Unsold"
+            });
+        }
     }
     
     gameState.cardOnBlock = null;
@@ -105,6 +113,30 @@ function resolveAuction() {
     }
 
     io.emit('updateState', gameState);
+}
+
+// Automatically ends the auction early if everyone passes
+function checkAuctionEndEarly() {
+    if (!gameState.cardOnBlock) return;
+    
+    // Only count managers who are still 'Active' in the auction
+    const activeMgrs = Object.keys(gameState.managers).filter(name => gameState.managers[name].Status === 'Active');
+    const passedCount = gameState.cardOnBlock.passedManagers.filter(m => activeMgrs.includes(m)).length;
+
+    let shouldEnd = false;
+    
+    if (gameState.cardOnBlock.highestBidder) {
+        // If there's a bid, and everyone EXCEPT the highest bidder passed -> END AUCTION
+        if (passedCount >= activeMgrs.length - 1) shouldEnd = true;
+    } else {
+        // If there are no bids, and EVERYONE passed -> END AUCTION (Unsold)
+        if (passedCount >= activeMgrs.length) shouldEnd = true;
+    }
+
+    if (shouldEnd) {
+        clearInterval(timerInterval);
+        resolveAuction();
+    }
 }
 
 io.on('connection', (socket) => {
@@ -137,7 +169,7 @@ io.on('connection', (socket) => {
     socket.on('registerManager', (data) => {
         if (data.name && !gameState.managers[data.name]) {
             gameState.managers[data.name] = { Formation: data.formation, Budget: 1000000000, Roster: [], Status: "Active" };
-            socketToManager[socket.id] = data.name; // Link socket to manager name
+            socketToManager[socket.id] = data.name; 
             socket.emit('managerRegistered', data.name);
             io.emit('updateState', gameState);
         }
@@ -169,7 +201,7 @@ io.on('connection', (socket) => {
 
     socket.on('submitPlayerEntry', (playerData) => {
         if (gameState.soldPlayers.includes(playerData.name.toLowerCase())) {
-            return socket.emit('auctionError', `Player '${playerData.name}' has already been sold! No duplicates allowed.`);
+            return socket.emit('auctionError', `Player '${playerData.name}' has already been sold (or went unsold)! No duplicates allowed.`);
         }
 
         const { atk: b_atk, dfc: b_def } = calculateBaseStats(playerData.position, playerData.stats);
@@ -189,11 +221,11 @@ io.on('connection', (socket) => {
         const rawVal = String(playerData.value).replace(/,/g, '');
         const { atk: f_atk, dfc: f_def } = applyBoosts(cardType, playerData.position, age, b_atk, b_def);
 
-        // UPDATED: timeLeft changed to 180 (3 minutes)
+        // Add 'passedManagers: []' to track passing logic
         gameState.cardOnBlock = {
             Name: playerData.name, Position: playerData.position, Club: playerData.club,
             CardType: cardType, Attack: f_atk, Defence: f_def, Value: parseInt(rawVal) || 1000000,
-            highestBid: 0, highestBidder: null, timeLeft: 180
+            highestBid: 0, highestBidder: null, timeLeft: 180, passedManagers: []
         };
         io.emit('updateState', gameState);
 
@@ -212,12 +244,37 @@ io.on('connection', (socket) => {
         }, 1000);
     });
 
+    // Toggle Pass Logic
+    socket.on('togglePass', (data) => {
+        const { mgrName, isPassing } = data;
+        if (!gameState.cardOnBlock || !gameState.managers[mgrName]) return;
+        
+        // Cannot pass if leading the auction
+        if (gameState.cardOnBlock.highestBidder === mgrName) {
+            return socket.emit('auctionError', "You cannot pass while holding the highest bid!");
+        }
+
+        if (isPassing) {
+            if (!gameState.cardOnBlock.passedManagers.includes(mgrName)) {
+                gameState.cardOnBlock.passedManagers.push(mgrName);
+            }
+        } else {
+            gameState.cardOnBlock.passedManagers = gameState.cardOnBlock.passedManagers.filter(m => m !== mgrName);
+        }
+
+        io.emit('updateState', gameState);
+        checkAuctionEndEarly(); 
+    });
+
     socket.on('placeBid', (data) => {
         const { mgrName, bidAmount } = data;
         const mgr = gameState.managers[mgrName];
         const bid = parseInt(String(bidAmount).replace(/,/g, ''));
 
         if (mgr && gameState.cardOnBlock && mgr.Status === "Active") {
+            if (gameState.cardOnBlock.passedManagers.includes(mgrName)) {
+                return socket.emit('auctionError', "You have passed on this player! Toggle 'Pass' off to bid again.");
+            }
             if (bid < 1000000) {
                 return socket.emit('auctionError', "Minimum bid is €1,000,000.");
             }
@@ -228,12 +285,15 @@ io.on('connection', (socket) => {
                 gameState.cardOnBlock.highestBid = bid;
                 gameState.cardOnBlock.highestBidder = mgrName;
                 
-                // This logic still correctly resets the clock to 10s if under 10s!
                 if (gameState.cardOnBlock.timeLeft <= 10) {
                     gameState.cardOnBlock.timeLeft = 10;
                     io.emit('timerTick', 10);
                 }
+                
                 io.emit('updateState', gameState);
+                
+                // Triggers immediately in case all other managers had already passed
+                checkAuctionEndEarly();
             }
         }
     });

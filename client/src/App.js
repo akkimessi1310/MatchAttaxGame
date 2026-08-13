@@ -23,13 +23,8 @@ const formatCurrency = (val) => {
 
 // Premium Theme Colors
 const theme = {
-    bgMain: '#0b0e14',
-    bgCard: '#151922',
-    accentNeon: '#00ff87', // FC 24/25 style neon green
-    accentGold: '#FFD700',
-    textMain: '#f0f2f5',
-    textMuted: '#a0aabc',
-    border: '#2a2d34'
+    bgMain: '#0b0e14', bgCard: '#151922', accentNeon: '#00ff87', accentGold: '#FFD700', 
+    textMain: '#f0f2f5', textMuted: '#a0aabc', border: '#2a2d34', alertRed: '#ff4d4d'
 };
 
 const inputStyle = {
@@ -93,6 +88,10 @@ function App() {
     setManagerBids({...managerBids, [mgrName]: ''}); 
   };
 
+  const togglePass = (mgrName, isPassing) => {
+      socket.emit('togglePass', { mgrName, isPassing });
+  };
+
   const downloadExcel = () => {
     const headers = ["Player Name", "Card Type", "Rating", "Base Price", "Final Price", "Winning Manager"];
     const rows = gameState.auctionHistory.map(item => 
@@ -119,7 +118,6 @@ function App() {
   return (
     <div style={{ padding: '30px 20px', fontFamily: '"Segoe UI", Tahoma, Geneva, Verdana, sans-serif', maxWidth: '1200px', margin: 'auto', minHeight: '100vh', color: theme.textMain }}>
       
-      {/* Global Style Injection */}
       <style>{`
         body { background-color: ${theme.bgMain}; margin: 0; color: ${theme.textMain}; }
         input:focus, select:focus { outline: 2px solid ${theme.accentNeon}; border-color: transparent !important; }
@@ -231,7 +229,7 @@ function App() {
                 <td><span style={{ color: data.Status === 'Active' ? theme.accentNeon : theme.textMuted }}>{data.Status}</span></td>
                 <td>
                     <button onClick={() => setViewRosterMgr(viewRosterMgr === name ? null : name)} style={{ ...btnStyle, padding: '6px 12px', background: '#2c3e50', color: '#fff', fontSize: '12px' }}>View Squad</button>
-                    {gameState.auctionStatus === "Lobby" && <button onClick={() => socket.emit('removeManager', name)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', marginLeft: '10px', fontSize: '16px' }}>✖</button>}
+                    {gameState.auctionStatus === "Lobby" && <button onClick={() => socket.emit('removeManager', name)} style={{ background: 'none', border: 'none', color: theme.alertRed, cursor: 'pointer', marginLeft: '10px', fontSize: '16px' }}>✖</button>}
                 </td>
               </tr>
             ))}
@@ -259,7 +257,7 @@ function App() {
         <section>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, color: theme.accentNeon, textTransform: 'uppercase' }}>2. Global Scouting Network</h3>
-              <div style={{ background: 'rgba(255, 0, 0, 0.1)', color: '#ff4d4d', padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(255, 0, 0, 0.3)', fontWeight: 'bold', fontSize: '14px' }}>
+              <div style={{ background: 'rgba(255, 0, 0, 0.1)', color: theme.alertRed, padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(255, 0, 0, 0.3)', fontWeight: 'bold', fontSize: '14px' }}>
                   🎯 {activeManagerName}'S TURN TO SCOUT
               </div>
           </div>
@@ -324,7 +322,7 @@ function App() {
                 <h2 style={{ margin: 0, fontSize: '2.2rem', color: '#fff', textTransform: 'uppercase' }}>{gameState.cardOnBlock.Name} <span style={{ color: theme.textMuted, fontSize: '1.5rem' }}>[{gameState.cardOnBlock.Position}]</span></h2>
             </div>
             <div style={{ textAlign: 'right' }}>
-                <h1 style={{ margin: 0, fontSize: '3rem', color: timeLeft <= 10 ? '#ff4d4d' : theme.accentNeon, textShadow: `0 0 10px ${timeLeft <= 10 ? 'rgba(255,0,0,0.5)' : 'rgba(0,255,135,0.3)'}` }}>
+                <h1 style={{ margin: 0, fontSize: '3rem', color: timeLeft <= 10 ? theme.alertRed : theme.accentNeon, textShadow: `0 0 10px ${timeLeft <= 10 ? 'rgba(255,0,0,0.5)' : 'rgba(0,255,135,0.3)'}` }}>
                     {timeLeft}s
                 </h1>
             </div>
@@ -342,7 +340,7 @@ function App() {
               <div>
                   <div style={{ color: theme.textMuted, fontSize: '12px', textTransform: 'uppercase' }}>OVR Attributes</div>
                   <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
-                      <span style={{ color: '#00b8ff' }}>ATK {gameState.cardOnBlock.Attack}</span> <span style={{ color: '#444' }}>|</span> <span style={{ color: '#ff4d4d' }}>DEF {gameState.cardOnBlock.Defence}</span>
+                      <span style={{ color: '#00b8ff' }}>ATK {gameState.cardOnBlock.Attack}</span> <span style={{ color: '#444' }}>|</span> <span style={{ color: theme.alertRed }}>DEF {gameState.cardOnBlock.Defence}</span>
                   </div>
               </div>
           </div>
@@ -364,21 +362,43 @@ function App() {
             {Object.keys(gameState.managers)
               .filter(name => gameState.managers[name].Status === 'Active')
               .filter(name => isOnlineMode ? name === myManagerName : true)
-              .map(name => (
-                <div key={name} style={{ flex: 1, minWidth: '250px', border: `1px solid ${theme.border}`, padding: '20px', borderRadius: '8px', background: '#0b0e14' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-                        <strong style={{ fontSize: '18px', color: '#fff' }}>{name}</strong>
-                        <span style={{ color: theme.accentGold, fontFamily: 'monospace' }}>€{gameState.managers[name].Budget.toLocaleString()}</span>
+              .map(name => {
+                  const isHighestBidder = gameState.cardOnBlock.highestBidder === name;
+                  const hasPassed = gameState.cardOnBlock.passedManagers?.includes(name);
+
+                  return (
+                    <div key={name} style={{ flex: 1, minWidth: '250px', border: `1px solid ${hasPassed ? '#333' : theme.border}`, padding: '20px', borderRadius: '8px', background: '#0b0e14', opacity: hasPassed ? 0.6 : 1, transition: '0.3s' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
+                            <strong style={{ fontSize: '18px', color: '#fff', textDecoration: hasPassed ? 'line-through' : 'none' }}>{name}</strong>
+                            <span style={{ color: theme.accentGold, fontFamily: 'monospace' }}>€{gameState.managers[name].Budget.toLocaleString()}</span>
+                        </div>
+                        
+                        <div style={{ marginBottom: '12px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: isHighestBidder ? 'not-allowed' : 'pointer', opacity: isHighestBidder ? 0.4 : 1 }}>
+                                <input 
+                                    type="checkbox" 
+                                    checked={hasPassed || false}
+                                    disabled={isHighestBidder}
+                                    onChange={(e) => togglePass(name, e.target.checked)}
+                                    style={{ accentColor: theme.alertRed, width: '16px', height: '16px', cursor: isHighestBidder ? 'not-allowed' : 'pointer' }}
+                                />
+                                <span style={{ color: hasPassed ? theme.alertRed : theme.textMuted, fontWeight: hasPassed ? 'bold' : 'normal', fontSize: '13px', textTransform: 'uppercase' }}>
+                                    {hasPassed ? "Passed (Out of Auction)" : "Pass on Player"}
+                                </span>
+                            </label>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <input type="text" placeholder={hasPassed ? "PASSED" : "Enter bid..."} 
+                                disabled={hasPassed}
+                                value={managerBids[name] || ''} 
+                                onChange={(e) => setManagerBids({...managerBids, [name]: formatCurrency(e.target.value)})} 
+                                style={{ ...inputStyle, background: '#1a1a1a', cursor: hasPassed ? 'not-allowed' : 'text' }} />
+                            <button onClick={() => submitBid(name)} disabled={hasPassed} style={{ ...btnStyle, background: hasPassed ? '#444' : theme.accentNeon, width: '80px', color: hasPassed ? '#888' : '#000', cursor: hasPassed ? 'not-allowed' : 'pointer' }}>BID</button>
+                        </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                        <input type="text" placeholder="Enter bid..." 
-                            value={managerBids[name] || ''} 
-                            onChange={(e) => setManagerBids({...managerBids, [name]: formatCurrency(e.target.value)})} 
-                            style={{ ...inputStyle, background: '#1a1a1a' }} />
-                        <button onClick={() => submitBid(name)} style={{ ...btnStyle, background: theme.accentNeon, width: '80px' }}>BID</button>
-                    </div>
-                </div>
-            ))}
+                  );
+              })}
           </div>
         </section>
       )}
