@@ -119,7 +119,7 @@ function App() {
   return (
     <div style={{ padding: '30px 20px', fontFamily: '"Segoe UI", Tahoma, Geneva, Verdana, sans-serif', maxWidth: '1200px', margin: 'auto', minHeight: '100vh', color: theme.textMain }}>
       
-      {/* Global Style Injection for full-page dark mode */}
+      {/* Global Style Injection */}
       <style>{`
         body { background-color: ${theme.bgMain}; margin: 0; color: ${theme.textMain}; }
         input:focus, select:focus { outline: 2px solid ${theme.accentNeon}; border-color: transparent !important; }
@@ -160,23 +160,28 @@ function App() {
       </div>
 
       <details style={{ marginBottom: '30px', padding: '15px', background: theme.bgCard, borderRadius: '8px', border: `1px solid ${theme.border}`, cursor: 'pointer' }}>
-          <summary style={{ fontWeight: 'bold', color: theme.accentNeon }}>📊 View Card Spawn Probabilities</summary>
-          <div style={{ marginTop: '15px' }}>
-            <table>
+          <summary style={{ fontWeight: 'bold', color: theme.accentNeon }}>📊 View Card Spawn Probabilities & Boosts</summary>
+          <div style={{ marginTop: '15px', overflowX: 'auto' }}>
+            <table style={{ whiteSpace: 'nowrap' }}>
                 <thead>
-                    <tr><th>Card Variant</th><th>UEFA Club Probability</th><th>Non-UEFA Club (Age &gt; 30)</th></tr>
+                    <tr>
+                        <th>Card Variant</th>
+                        <th>UEFA Prob.</th>
+                        <th>Non-UEFA (&gt;30) Prob.</th>
+                        <th>Stat Boosts & Conditions</th>
+                    </tr>
                 </thead>
                 <tbody>
-                    <tr><td>Base Card</td><td>32%</td><td>90%</td></tr>
-                    <tr><td>Man of the Match</td><td>15%</td><td>-</td></tr>
-                    <tr><td>Wildcard</td><td>10%</td><td>-</td></tr>
-                    <tr><td>All-Action Hero</td><td>10%</td><td>-</td></tr>
-                    <tr><td>Heritage</td><td>8%</td><td>8%</td></tr>
-                    <tr><td>Counter Attax</td><td>8%</td><td>-</td></tr>
-                    <tr><td>Stealth Strike</td><td>6%</td><td>-</td></tr>
-                    <tr><td>100 Club</td><td>5%</td><td>-</td></tr>
-                    <tr><td>101 Club</td><td>4%</td><td>-</td></tr>
-                    <tr><td>Infinity</td><td>2%</td><td>2%</td></tr>
+                    <tr><td>Base Card</td><td>32%</td><td>90%</td><td style={{ color: theme.textMuted }}>None</td></tr>
+                    <tr><td>Man of the Match</td><td>15%</td><td>-</td><td><span style={{ color: theme.accentNeon }}>+3 ATK, +3 DEF</span> (All)</td></tr>
+                    <tr><td>Wildcard</td><td>10%</td><td>-</td><td><span style={{ color: theme.accentNeon }}>+5 ATK, +5 DEF</span> (CB, RB, LB, RM, LM, RW, LW, ST)</td></tr>
+                    <tr><td>All-Action Hero</td><td>10%</td><td>-</td><td><span style={{ color: theme.accentNeon }}>+5 ATK, +5 DEF</span> (CDM, CM, CAM, GK)</td></tr>
+                    <tr><td>Heritage</td><td>8%</td><td>8%</td><td><span style={{ color: theme.accentNeon }}>+7 ATK, +7 DEF</span> (Requires Age &gt; 30)</td></tr>
+                    <tr><td>Counter Attax</td><td>8%</td><td>-</td><td><span style={{ color: theme.accentNeon }}>+7 ATK, +3 DEF</span> (ST, RM, LM, RW, LW, LB, RB)</td></tr>
+                    <tr><td>Stealth Strike</td><td>6%</td><td>-</td><td><span style={{ color: theme.accentNeon }}>+10 ATK</span> (FWD/MID) <strong style={{ color: theme.textMuted }}>OR</strong> <span style={{ color: theme.accentNeon }}>+10 DEF</span> (DEF/GK)</td></tr>
+                    <tr><td>100 Club</td><td>5%</td><td>-</td><td><span style={{ color: theme.accentGold }}>100 ATK</span> (FWD/MID) <strong style={{ color: theme.textMuted }}>OR</strong> <span style={{ color: theme.accentGold }}>100 DEF</span> (DEF/GK)</td></tr>
+                    <tr><td>101 Club</td><td>4%</td><td>-</td><td><span style={{ color: theme.accentGold }}>101 ATK, 101 DEF</span> (All)</td></tr>
+                    <tr><td>Infinity</td><td>2%</td><td>2%</td><td><span style={{ color: '#8a2be2', fontWeight: 'bold' }}>Infinity ATK & DEF</span> (All)</td></tr>
                 </tbody>
             </table>
           </div>
