@@ -242,8 +242,13 @@ function App() {
                 {gameState.managers[viewRosterMgr].Roster.length === 0 ? <span style={{ color: theme.textMuted }}>Squad is empty.</span> : 
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                         {gameState.managers[viewRosterMgr].Roster.map((p, i) => (
-                            <span key={i} style={{ background: '#1e2330', padding: '6px 12px', borderRadius: '4px', fontSize: '13px', border: '1px solid #333' }}>
-                                <strong>{p.Name}</strong> <span style={{ color: theme.accentNeon }}>[{p.Position}]</span> <span style={{ color: theme.textMuted }}>({p.CardType})</span>
+                            <span key={i} style={{ background: '#1e2330', padding: '6px 12px', borderRadius: '4px', fontSize: '13px', border: '1px solid #333', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <strong>{p.Name}</strong> 
+                                <span style={{ color: theme.accentNeon }}>[{p.Position}]</span> 
+                                <span style={{ color: theme.textMuted }}>({p.CardType})</span>
+                                <span style={{ color: '#00b8ff', fontWeight: 'bold', marginLeft: '4px' }}>ATK {p.Attack}</span>
+                                <span style={{ color: '#444' }}>|</span>
+                                <span style={{ color: theme.alertRed, fontWeight: 'bold' }}>DEF {p.Defence}</span>
                             </span>
                         ))}
                     </div>
