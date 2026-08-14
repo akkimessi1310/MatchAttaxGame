@@ -340,21 +340,29 @@ function App() {
               <div>
                   <div style={{ color: theme.textMuted, fontSize: '12px', textTransform: 'uppercase' }}>OVR Attributes</div>
                   <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
-                      {gameState.cardOnBlock.CardType === "Base Card" ? (
-                          <>
-                              <span style={{ color: '#00b8ff' }}>ATK {gameState.cardOnBlock.Attack}</span> 
-                              <span style={{ color: '#444', margin: '0 8px' }}>|</span> 
-                              <span style={{ color: theme.alertRed }}>DEF {gameState.cardOnBlock.Defence}</span>
-                          </>
-                      ) : (
+                      
+                      {/* ATTACK STAT RENDER */}
+                      {gameState.cardOnBlock.CardType !== "Base Card" && gameState.cardOnBlock.Attack !== gameState.cardOnBlock.BaseAttack ? (
                           <>
                               <span style={{ color: theme.textMuted, fontSize: '14px', textDecoration: 'line-through' }}>{gameState.cardOnBlock.BaseAttack}</span>{' '}
-                              <span style={{ color: theme.accentGold }}>ATK {gameState.cardOnBlock.Attack}</span> 
-                              <span style={{ color: '#444', margin: '0 8px' }}>|</span> 
+                              <span style={{ color: theme.accentGold }}>ATK {gameState.cardOnBlock.Attack}</span>
+                          </>
+                      ) : (
+                          <span style={{ color: '#00b8ff' }}>ATK {gameState.cardOnBlock.Attack}</span>
+                      )}
+
+                      <span style={{ color: '#444', margin: '0 8px' }}>|</span>
+
+                      {/* DEFENCE STAT RENDER */}
+                      {gameState.cardOnBlock.CardType !== "Base Card" && gameState.cardOnBlock.Defence !== gameState.cardOnBlock.BaseDefence ? (
+                          <>
                               <span style={{ color: theme.textMuted, fontSize: '14px', textDecoration: 'line-through' }}>{gameState.cardOnBlock.BaseDefence}</span>{' '}
                               <span style={{ color: theme.accentGold }}>DEF {gameState.cardOnBlock.Defence}</span>
                           </>
+                      ) : (
+                          <span style={{ color: theme.alertRed }}>DEF {gameState.cardOnBlock.Defence}</span>
                       )}
+
                   </div>
               </div>
           </div>

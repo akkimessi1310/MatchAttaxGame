@@ -9,8 +9,11 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
 const UEFA_CLUBS = [
+    // Champions League
     "Ajax", "Arsenal", "Atalanta (Bergamo Calcio)", "Athletic Bilbao", "Atlético Madrid", "Barcelona", "Bayer Leverkusen", "Bayern Munich", "Benfica", "Bodø/Glimt", "Borussia Dortmund", "Chelsea", "Club Brugge", "Copenhagen", "Eintracht Frankfurt", "Galatasaray", "Inter Milan (Lombardia FC)", "Juventus", "Liverpool", "Manchester City", "Marseille", "Monaco", "Napoli", "Newcastle United", "Olympiacos", "Paris Saint-Germain", "PSV Eindhoven", "Qarabağ", "Real Madrid", "Slavia Prague", "Sporting CP", "Tottenham Hotspur", "Union Saint-Gilloise", "Villarreal",
+    // Europa League
     "Aston Villa", "Basel", "Bologna", "Braga", "Brann", "Celta Vigo", "Celtic", "Dinamo Zagreb", "FCSB", "Fenerbahçe", "Ferencváros", "Feyenoord", "Genk", "Go Ahead Eagles", "Lille", "Lyon", "Malmö FF", "Midtjylland", "Nice", "Nottingham Forest", "Panathinaikos", "PAOK", "Porto", "Rangers", "Real Betis", "Red Bull Salzburg", "Roma", "SC Freiburg", "Sturm Graz", "Utrecht", "VfB Stuttgart", "Viktoria Plzeň", "Young Boys",
+    // Conference League
     "Aberdeen", "AEK Athens", "AZ", "BK Häcken", "Crystal Palace", "Dynamo Kyiv", "Fiorentina", "Jagiellonia Białystok", "Lausanne-Sport", "Lech Poznań", "Legia Warsaw", "Mainz 05", "Raków Częstochowa", "Rapid Wien", "Rayo Vallecano", "Samsunspor", "Shakhtar Donetsk", "Shamrock Rovers", "Shelbourne", "Sparta Prague", "Strasbourg", "Universitatea Craiova"
 ];
 
@@ -198,25 +201,51 @@ io.on('connection', (socket) => {
         const { atk: b_atk, dfc: b_def } = calculateBaseStats(playerData.position, playerData.stats);
         const age = parseInt(playerData.age) || 25;
         const isUefa = UEFA_CLUBS.includes(playerData.club);
+        const pos = playerData.position;
 
         let cardType = "Base Card";
 
+        // NEW LOGIC: Filter out ineligible cards BEFORE spinning the wheel
         if (isUefa) {
-            cardType = getWeightedRandom(RARITY_TIERS, RARITY_WEIGHTS);
+            let eligibleTiers = [];
+            let eligibleWeights = [];
+
+            for (let i = 0; i < RARITY_TIERS.length; i++) {
+                const tier = RARITY_TIERS[i];
+                const weight = RARITY_WEIGHTS[i];
+                let isEligible = false;
+
+                if (["Base Card", "Man of the Match", "Stealth Strike", "100 Club", "101 Club", "Infinity"].includes(tier)) {
+                    isEligible = true; // These apply to all positions in some form
+                } else if (tier === "Wildcard" && ['CB','RB','LB','RM','LM','RW','LW','ST'].includes(pos)) {
+                    isEligible = true;
+                } else if (tier === "All-Action Hero" && ['CDM','CM','CAM','GK'].includes(pos)) {
+                    isEligible = true;
+                } else if (tier === "Heritage" && age > 30) {
+                    isEligible = true;
+                } else if (tier === "Counter Attax" && ['ST','RM','LM','RW','LW','LB','RB'].includes(pos)) {
+                    isEligible = true;
+                }
+
+                if (isEligible) {
+                    eligibleTiers.push(tier);
+                    eligibleWeights.push(weight);
+                }
+            }
+            // Engine will automatically distribute probabilities amongst eligible cards
+            cardType = getWeightedRandom(eligibleTiers, eligibleWeights);
         } else if (age > 30) {
-            const nonUefaTiers = ["Base Card", "Heritage", "Infinity"];
-            const nonUefaWeights = [90.0, 8.0, 2.0];
-            cardType = getWeightedRandom(nonUefaTiers, nonUefaWeights);
+            cardType = getWeightedRandom(["Base Card", "Heritage", "Infinity"], [90.0, 8.0, 2.0]);
         }
 
         const rawVal = String(playerData.value).replace(/,/g, '');
-        const { atk: f_atk, dfc: f_def } = applyBoosts(cardType, playerData.position, age, b_atk, b_def);
+        const { atk: f_atk, dfc: f_def } = applyBoosts(cardType, pos, age, b_atk, b_def);
 
         gameState.cardOnBlock = {
-            Name: playerData.name, Position: playerData.position, Club: playerData.club,
+            Name: playerData.name, Position: pos, Club: playerData.club,
             CardType: cardType, 
             Attack: f_atk, Defence: f_def, 
-            BaseAttack: b_atk, BaseDefence: b_def, // NEW: Sending base stats to frontend
+            BaseAttack: b_atk, BaseDefence: b_def, 
             Value: parseInt(rawVal) || 1000000,
             highestBid: 0, highestBidder: null, timeLeft: 180, passedManagers: []
         };
