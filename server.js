@@ -9,11 +9,8 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
 const UEFA_CLUBS = [
-    // Champions League
     "Ajax", "Arsenal", "Atalanta (Bergamo Calcio)", "Athletic Bilbao", "Atlético Madrid", "Barcelona", "Bayer Leverkusen", "Bayern Munich", "Benfica", "Bodø/Glimt", "Borussia Dortmund", "Chelsea", "Club Brugge", "Copenhagen", "Eintracht Frankfurt", "Galatasaray", "Inter Milan (Lombardia FC)", "Juventus", "Liverpool", "Manchester City", "Marseille", "Monaco", "Napoli", "Newcastle United", "Olympiacos", "Paris Saint-Germain", "PSV Eindhoven", "Qarabağ", "Real Madrid", "Slavia Prague", "Sporting CP", "Tottenham Hotspur", "Union Saint-Gilloise", "Villarreal",
-    // Europa League
     "Aston Villa", "Basel", "Bologna", "Braga", "Brann", "Celta Vigo", "Celtic", "Dinamo Zagreb", "FCSB", "Fenerbahçe", "Ferencváros", "Feyenoord", "Genk", "Go Ahead Eagles", "Lille", "Lyon", "Malmö FF", "Midtjylland", "Nice", "Nottingham Forest", "Panathinaikos", "PAOK", "Porto", "Rangers", "Real Betis", "Red Bull Salzburg", "Roma", "SC Freiburg", "Sturm Graz", "Utrecht", "VfB Stuttgart", "Viktoria Plzeň", "Young Boys",
-    // Conference League
     "Aberdeen", "AEK Athens", "AZ", "BK Häcken", "Crystal Palace", "Dynamo Kyiv", "Fiorentina", "Jagiellonia Białystok", "Lausanne-Sport", "Lech Poznań", "Legia Warsaw", "Mainz 05", "Raków Częstochowa", "Rapid Wien", "Rayo Vallecano", "Samsunspor", "Shakhtar Donetsk", "Shamrock Rovers", "Shelbourne", "Sparta Prague", "Strasbourg", "Universitatea Craiova"
 ];
 
@@ -78,7 +75,6 @@ function resolveAuction() {
     const card = gameState.cardOnBlock;
     if (card) {
         if (card.highestBidder) {
-            // Player is sold to highest bidder
             const mgr = gameState.managers[card.highestBidder];
             mgr.Budget -= card.highestBid;
             mgr.Roster.push({ ...card, isStarting: false });
@@ -97,8 +93,7 @@ function resolveAuction() {
                 Player: card.Name, CardType: card.CardType, Rating: `${card.Attack}/${card.Defence}`, BasePrice: card.Value, FinalPrice: card.highestBid, Winner: card.highestBidder
             });
         } else {
-            // Player goes UNSOLD
-            gameState.soldPlayers.push(card.Name.toLowerCase()); // Prevents re-entering the same unsold player
+            gameState.soldPlayers.push(card.Name.toLowerCase());
             gameState.auctionHistory.push({
                 Player: card.Name, CardType: card.CardType, Rating: `${card.Attack}/${card.Defence}`, BasePrice: card.Value, FinalPrice: 0, Winner: "Unsold"
             });
@@ -115,21 +110,17 @@ function resolveAuction() {
     io.emit('updateState', gameState);
 }
 
-// Automatically ends the auction early if everyone passes
 function checkAuctionEndEarly() {
     if (!gameState.cardOnBlock) return;
     
-    // Only count managers who are still 'Active' in the auction
     const activeMgrs = Object.keys(gameState.managers).filter(name => gameState.managers[name].Status === 'Active');
     const passedCount = gameState.cardOnBlock.passedManagers.filter(m => activeMgrs.includes(m)).length;
 
     let shouldEnd = false;
     
     if (gameState.cardOnBlock.highestBidder) {
-        // If there's a bid, and everyone EXCEPT the highest bidder passed -> END AUCTION
         if (passedCount >= activeMgrs.length - 1) shouldEnd = true;
     } else {
-        // If there are no bids, and EVERYONE passed -> END AUCTION (Unsold)
         if (passedCount >= activeMgrs.length) shouldEnd = true;
     }
 
@@ -221,10 +212,12 @@ io.on('connection', (socket) => {
         const rawVal = String(playerData.value).replace(/,/g, '');
         const { atk: f_atk, dfc: f_def } = applyBoosts(cardType, playerData.position, age, b_atk, b_def);
 
-        // Add 'passedManagers: []' to track passing logic
         gameState.cardOnBlock = {
             Name: playerData.name, Position: playerData.position, Club: playerData.club,
-            CardType: cardType, Attack: f_atk, Defence: f_def, Value: parseInt(rawVal) || 1000000,
+            CardType: cardType, 
+            Attack: f_atk, Defence: f_def, 
+            BaseAttack: b_atk, BaseDefence: b_def, // NEW: Sending base stats to frontend
+            Value: parseInt(rawVal) || 1000000,
             highestBid: 0, highestBidder: null, timeLeft: 180, passedManagers: []
         };
         io.emit('updateState', gameState);
@@ -244,12 +237,10 @@ io.on('connection', (socket) => {
         }, 1000);
     });
 
-    // Toggle Pass Logic
     socket.on('togglePass', (data) => {
         const { mgrName, isPassing } = data;
         if (!gameState.cardOnBlock || !gameState.managers[mgrName]) return;
         
-        // Cannot pass if leading the auction
         if (gameState.cardOnBlock.highestBidder === mgrName) {
             return socket.emit('auctionError', "You cannot pass while holding the highest bid!");
         }
@@ -291,8 +282,6 @@ io.on('connection', (socket) => {
                 }
                 
                 io.emit('updateState', gameState);
-                
-                // Triggers immediately in case all other managers had already passed
                 checkAuctionEndEarly();
             }
         }
