@@ -9,11 +9,8 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
 const UEFA_CLUBS = [
-    // Champions League
     "Ajax", "Arsenal", "Atalanta (Bergamo Calcio)", "Athletic Bilbao", "Atlético Madrid", "Barcelona", "Bayer Leverkusen", "Bayern Munich", "Benfica", "Bodø/Glimt", "Borussia Dortmund", "Chelsea", "Club Brugge", "Copenhagen", "Eintracht Frankfurt", "Galatasaray", "Inter Milan (Lombardia FC)", "Juventus", "Liverpool", "Manchester City", "Marseille", "Monaco", "Napoli", "Newcastle United", "Olympiacos", "Paris Saint-Germain", "PSV Eindhoven", "Qarabağ", "Real Madrid", "Slavia Prague", "Sporting CP", "Tottenham Hotspur", "Union Saint-Gilloise", "Villarreal",
-    // Europa League
     "Aston Villa", "Basel", "Bologna", "Braga", "Brann", "Celta Vigo", "Celtic", "Dinamo Zagreb", "FCSB", "Fenerbahçe", "Ferencváros", "Feyenoord", "Genk", "Go Ahead Eagles", "Lille", "Lyon", "Malmö FF", "Midtjylland", "Nice", "Nottingham Forest", "Panathinaikos", "PAOK", "Porto", "Rangers", "Real Betis", "Red Bull Salzburg", "Roma", "SC Freiburg", "Sturm Graz", "Utrecht", "VfB Stuttgart", "Viktoria Plzeň", "Young Boys",
-    // Conference League
     "Aberdeen", "AEK Athens", "AZ", "BK Häcken", "Crystal Palace", "Dynamo Kyiv", "Fiorentina", "Jagiellonia Białystok", "Lausanne-Sport", "Lech Poznań", "Legia Warsaw", "Mainz 05", "Raków Częstochowa", "Rapid Wien", "Rayo Vallecano", "Samsunspor", "Shakhtar Donetsk", "Shamrock Rovers", "Shelbourne", "Sparta Prague", "Strasbourg", "Universitatea Craiova"
 ];
 
@@ -81,11 +78,22 @@ function resolveAuction() {
             const mgr = gameState.managers[card.highestBidder];
             mgr.Budget -= card.highestBid;
             mgr.Roster.push({ ...card, isStarting: false });
+            
+            // Only add to soldPlayers if actually sold
             gameState.soldPlayers.push(card.Name.toLowerCase());
 
             if (mgr.Budget <= 0) {
+                let punishmentCount = 1;
                 while (mgr.Roster.length < 11) {
-                    mgr.Roster.push({ Name: "Auto-Fill Penalty", Position: "N/A", CardType: "Base Card", Attack: Math.floor(Math.random()*31)+30, Defence: Math.floor(Math.random()*31)+30, isStarting: false });
+                    mgr.Roster.push({ 
+                        Name: `Punishment Player ${punishmentCount}`, 
+                        Position: "N/A", 
+                        CardType: "Base Card", 
+                        Attack: Math.floor(Math.random()*31)+30, 
+                        Defence: Math.floor(Math.random()*31)+30, 
+                        isStarting: false 
+                    });
+                    punishmentCount++;
                 }
                 mgr.Status = mgr.Roster.length === 11 ? "Auction Ended (Auto-filled)" : "Auction Ended (No extra subs)";
             } else if (mgr.Roster.length >= 18) {
@@ -96,7 +104,7 @@ function resolveAuction() {
                 Player: card.Name, CardType: card.CardType, Rating: `${card.Attack}/${card.Defence}`, BasePrice: card.Value, FinalPrice: card.highestBid, Winner: card.highestBidder
             });
         } else {
-            gameState.soldPlayers.push(card.Name.toLowerCase());
+            // Unsold players are NOT pushed to gameState.soldPlayers, allowing them to return
             gameState.auctionHistory.push({
                 Player: card.Name, CardType: card.CardType, Rating: `${card.Attack}/${card.Defence}`, BasePrice: card.Value, FinalPrice: 0, Winner: "Unsold"
             });
@@ -195,7 +203,7 @@ io.on('connection', (socket) => {
 
     socket.on('submitPlayerEntry', (playerData) => {
         if (gameState.soldPlayers.includes(playerData.name.toLowerCase())) {
-            return socket.emit('auctionError', `Player '${playerData.name}' has already been sold (or went unsold)! No duplicates allowed.`);
+            return socket.emit('auctionError', `Player '${playerData.name}' has already been sold! No duplicates allowed.`);
         }
 
         const { atk: b_atk, dfc: b_def } = calculateBaseStats(playerData.position, playerData.stats);
@@ -205,7 +213,6 @@ io.on('connection', (socket) => {
 
         let cardType = "Base Card";
 
-        // NEW LOGIC: Filter out ineligible cards BEFORE spinning the wheel
         if (isUefa) {
             let eligibleTiers = [];
             let eligibleWeights = [];
@@ -216,7 +223,7 @@ io.on('connection', (socket) => {
                 let isEligible = false;
 
                 if (["Base Card", "Man of the Match", "Stealth Strike", "100 Club", "101 Club", "Infinity"].includes(tier)) {
-                    isEligible = true; // These apply to all positions in some form
+                    isEligible = true; 
                 } else if (tier === "Wildcard" && ['CB','RB','LB','RM','LM','RW','LW','ST'].includes(pos)) {
                     isEligible = true;
                 } else if (tier === "All-Action Hero" && ['CDM','CM','CAM','GK'].includes(pos)) {
@@ -232,7 +239,6 @@ io.on('connection', (socket) => {
                     eligibleWeights.push(weight);
                 }
             }
-            // Engine will automatically distribute probabilities amongst eligible cards
             cardType = getWeightedRandom(eligibleTiers, eligibleWeights);
         } else if (age > 30) {
             cardType = getWeightedRandom(["Base Card", "Heritage", "Infinity"], [90.0, 8.0, 2.0]);
