@@ -189,12 +189,21 @@ function App() {
       {gameState.auctionStatus === "Lobby" && (
         <section>
           <h3 style={{ marginTop: 0, color: theme.accentNeon, textTransform: 'uppercase', letterSpacing: '1px' }}>1. Manager Headquarters</h3>
+          
+          <div style={{ marginBottom: '20px', padding: '12px', background: 'rgba(255, 215, 0, 0.05)', border: `1px solid ${theme.accentGold}`, borderRadius: '6px', color: theme.accentGold, fontSize: '14px' }}>
+              <strong>🌐 PLAYING ONLINE?</strong> Do NOT register your friends here! Send them the website link and have them join from their own devices. Once everyone is in the list below, click an <strong>Online</strong> game mode!
+          </div>
+
           <div style={{ display: 'flex', gap: '15px', marginBottom: '25px', maxWidth: '600px' }}>
               <input type="text" placeholder="Enter Manager Name" value={regName} onChange={(e) => setRegName(e.target.value)} style={inputStyle} />
               <select value={regFormation} onChange={(e) => setRegFormation(e.target.value)} style={{...inputStyle, width: '250px'}}>
                 {FORMATIONS.map(form => <option key={form} value={form}>{form}</option>)}
               </select>
-              <button onClick={() => { socket.emit('registerManager', { name: regName, formation: regFormation }); setRegName(''); }} style={{ ...btnStyle, background: theme.accentNeon, minWidth: '120px' }}>Join Lobby</button>
+              <button onClick={() => { 
+                  if(regName.trim() === '') return;
+                  socket.emit('registerManager', { name: regName, formation: regFormation }); 
+                  setRegName(''); 
+              }} style={{ ...btnStyle, background: theme.accentNeon, minWidth: '120px' }}>Join Lobby</button>
           </div>
           
           <div style={{ borderTop: `1px solid ${theme.border}`, paddingTop: '20px' }}>
@@ -267,9 +276,15 @@ function App() {
               </div>
           </div>
           
+          {/* PRIVATE SCOUTING LOGIC FOR ONLINE MODE */}
           {!isMyTurn ? (
-            <div style={{ padding: '40px', background: '#0b0e14', borderRadius: '8px', textAlign: 'center', border: `1px dashed #333` }}>
-               <h4 style={{ color: theme.textMuted, margin: 0, fontWeight: 'normal' }}>⏳ Waiting for <strong>{activeManagerName}</strong> to finalize scouting target...</h4>
+            <div style={{ padding: '50px 20px', background: '#0b0e14', borderRadius: '8px', textAlign: 'center', border: `1px solid ${theme.border}`, boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5)' }}>
+                <div style={{ fontSize: '40px', marginBottom: '15px' }}>🕵️‍♂️</div>
+                <h3 style={{ color: '#fff', margin: '0 0 10px 0', textTransform: 'uppercase' }}>Scouting in Progress</h3>
+                <p style={{ color: theme.textMuted, fontSize: '16px', margin: 0 }}>
+                    Waiting for <strong style={{ color: theme.accentNeon }}>{activeManagerName}</strong> to finalize their transfer target.
+                </p>
+                <p style={{ color: '#555', fontSize: '13px', marginTop: '15px' }}>Their screen inputs are hidden from you to prevent sniping.</p>
             </div>
           ) : (
             <>
@@ -388,41 +403,64 @@ function App() {
           <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
             {Object.keys(gameState.managers)
               .filter(name => gameState.managers[name].Status === 'Active')
-              .filter(name => isOnlineMode ? name === myManagerName : true)
               .map(name => {
                   const isHighestBidder = gameState.cardOnBlock.highestBidder === name;
                   const hasPassed = gameState.cardOnBlock.passedManagers?.includes(name);
+                  
+                  // NEW LOGIC: Restricts bidding to ONLY your console if playing Online
+                  const isMyConsole = isOnlineMode ? name === myManagerName : true;
 
                   return (
-                    <div key={name} style={{ flex: 1, minWidth: '250px', border: `1px solid ${hasPassed ? '#333' : theme.border}`, padding: '20px', borderRadius: '8px', background: '#0b0e14', opacity: hasPassed ? 0.6 : 1, transition: '0.3s' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
+                    <div key={name} style={{ flex: 1, minWidth: '250px', border: `1px solid ${hasPassed ? '#333' : (isMyConsole ? theme.accentNeon : theme.border)}`, padding: '20px', borderRadius: '8px', background: isMyConsole ? '#11151c' : '#0b0e14', opacity: hasPassed ? 0.6 : 1, transition: '0.3s', position: 'relative' }}>
+                        
+                        {/* Identify "Your Console" visually during Online Mode */}
+                        {isMyConsole && isOnlineMode && (
+                            <div style={{ position: 'absolute', top: '-10px', left: '20px', background: theme.accentNeon, color: '#000', fontSize: '11px', fontWeight: 'bold', padding: '2px 8px', borderRadius: '4px', textTransform: 'uppercase' }}>YOUR CONSOLE</div>
+                        )}
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', marginTop: isMyConsole && isOnlineMode ? '5px' : '0' }}>
                             <strong style={{ fontSize: '18px', color: '#fff', textDecoration: hasPassed ? 'line-through' : 'none' }}>{name}</strong>
                             <span style={{ color: theme.accentGold, fontFamily: 'monospace' }}>€{gameState.managers[name].Budget.toLocaleString()}</span>
                         </div>
                         
-                        <div style={{ marginBottom: '12px' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: isHighestBidder ? 'not-allowed' : 'pointer', opacity: isHighestBidder ? 0.4 : 1 }}>
-                                <input 
-                                    type="checkbox" 
-                                    checked={hasPassed || false}
-                                    disabled={isHighestBidder}
-                                    onChange={(e) => togglePass(name, e.target.checked)}
-                                    style={{ accentColor: theme.alertRed, width: '16px', height: '16px', cursor: isHighestBidder ? 'not-allowed' : 'pointer' }}
-                                />
-                                <span style={{ color: hasPassed ? theme.alertRed : theme.textMuted, fontWeight: hasPassed ? 'bold' : 'normal', fontSize: '13px', textTransform: 'uppercase' }}>
-                                    {hasPassed ? "Passed (Out of Auction)" : "Pass on Player"}
-                                </span>
-                            </label>
-                        </div>
+                        {isMyConsole ? (
+                            <>
+                                <div style={{ marginBottom: '12px' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: isHighestBidder ? 'not-allowed' : 'pointer', opacity: isHighestBidder ? 0.4 : 1 }}>
+                                        <input 
+                                            type="checkbox" 
+                                            checked={hasPassed || false}
+                                            disabled={isHighestBidder}
+                                            onChange={(e) => togglePass(name, e.target.checked)}
+                                            style={{ accentColor: theme.alertRed, width: '16px', height: '16px', cursor: isHighestBidder ? 'not-allowed' : 'pointer' }}
+                                        />
+                                        <span style={{ color: hasPassed ? theme.alertRed : theme.textMuted, fontWeight: hasPassed ? 'bold' : 'normal', fontSize: '13px', textTransform: 'uppercase' }}>
+                                            {hasPassed ? "Passed (Out of Auction)" : "Pass on Player"}
+                                        </span>
+                                    </label>
+                                </div>
 
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                            <input type="text" placeholder={hasPassed ? "PASSED" : "Enter bid..."} 
-                                disabled={hasPassed}
-                                value={managerBids[name] || ''} 
-                                onChange={(e) => setManagerBids({...managerBids, [name]: formatCurrency(e.target.value)})} 
-                                style={{ ...inputStyle, background: '#1a1a1a', cursor: hasPassed ? 'not-allowed' : 'text' }} />
-                            <button onClick={() => submitBid(name)} disabled={hasPassed} style={{ ...btnStyle, background: hasPassed ? '#444' : theme.accentNeon, width: '80px', color: hasPassed ? '#888' : '#000', cursor: hasPassed ? 'not-allowed' : 'pointer' }}>BID</button>
-                        </div>
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    <input type="text" placeholder={hasPassed ? "PASSED" : "Enter bid..."} 
+                                        disabled={hasPassed}
+                                        value={managerBids[name] || ''} 
+                                        onChange={(e) => setManagerBids({...managerBids, [name]: formatCurrency(e.target.value)})} 
+                                        style={{ ...inputStyle, background: '#1a1a1a', cursor: hasPassed ? 'not-allowed' : 'text' }} />
+                                    <button onClick={() => submitBid(name)} disabled={hasPassed} style={{ ...btnStyle, background: hasPassed ? '#444' : theme.accentNeon, width: '80px', color: hasPassed ? '#888' : '#000', cursor: hasPassed ? 'not-allowed' : 'pointer' }}>BID</button>
+                                </div>
+                            </>
+                        ) : (
+                            // OPPONENT CONSOLE - READ ONLY
+                            <div style={{ height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: `1px dashed ${theme.border}` }}>
+                                {hasPassed ? (
+                                    <span style={{ color: theme.alertRed, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>🚫 Passed</span>
+                                ) : isHighestBidder ? (
+                                    <span style={{ color: theme.accentGold, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>👑 Leading Bid</span>
+                                ) : (
+                                    <span style={{ color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '1px', fontSize: '13px' }}>⏳ Evaluating...</span>
+                                )}
+                            </div>
+                        )}
                     </div>
                   );
               })}
@@ -430,7 +468,7 @@ function App() {
         </section>
       )}
 
-      {/* SQUAD BUILDER / COMPLETED SCREEN */}
+      {/* PRIVATE SQUAD BUILDER / COMPLETED SCREEN */}
       {gameState.auctionStatus === "Completed" && (
           <section style={{ border: `2px solid ${theme.accentNeon}`, boxShadow: `0 0 15px rgba(0, 255, 135, 0.1)` }}>
               <div style={{ textAlign: 'center', marginBottom: '30px' }}>
@@ -438,6 +476,7 @@ function App() {
                 <p style={{ color: theme.textMuted, fontSize: '16px' }}>Select exactly 11 players for your Starting XI. The rest will move to the bench.</p>
               </div>
               
+              {/* Only maps over your own personal manager profile if playing Online Mode */}
               {Object.entries(gameState.managers)
                 .filter(([name]) => isOnlineMode ? name === myManagerName : true)
                 .map(([name, data]) => {
