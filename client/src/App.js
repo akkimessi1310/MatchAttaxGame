@@ -38,9 +38,13 @@ const btnStyle = {
 };
 
 function App() {
-  const [gameState, setGameState] = useState({ managers: {}, auctionHistory: [], cardOnBlock: null, turnOrder: [], currentTurnIndex: 0, auctionStatus: "Lobby", bracket: null });
+  const [gameState, setGameState] = useState({ managers: {}, auctionHistory: [], cardOnBlock: null, turnOrder: [], currentTurnIndex: 0, auctionStatus: "Lobby", bracket: null, draftSystem: "Auction" });
   const [myManagerName, setMyManagerName] = useState(localStorage.getItem('myManagerName') || '');
   const [timeLeft, setTimeLeft] = useState(0);
+  
+  // NEW: Lobby System Selection
+  const [systemSelection, setSystemSelection] = useState('Auction');
+  
   const [regName, setRegName] = useState('');
   const [regFormation, setRegFormation] = useState(FORMATIONS[0]);
   
@@ -56,7 +60,9 @@ function App() {
   useEffect(() => {
     socket.on('updateState', (newState) => {
         setGameState(newState);
-        if (newState.cardOnBlock) setTimeLeft(newState.cardOnBlock.timeLeft);
+        if (newState.draftSystem === "Auction" && newState.cardOnBlock) {
+            setTimeLeft(newState.cardOnBlock.timeLeft);
+        }
     });
     socket.on('managerRegistered', (name) => {
         setMyManagerName(name);
@@ -101,14 +107,15 @@ function App() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "Match_Attax_Auction_History.csv");
+    link.setAttribute("download", "Match_Attax_Match_Data.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const activeManagerName = gameState.turnOrder[gameState.currentTurnIndex] || "";
   const isOnlineMode = gameState.gameMode && gameState.gameMode.includes("Online");
+  const isDraftMode = gameState.draftSystem === "Draft";
+  const activeManagerName = isDraftMode ? gameState.activeDraftManager : (gameState.turnOrder[gameState.currentTurnIndex] || "");
   const isMyTurn = isOnlineMode ? myManagerName === activeManagerName : true;
 
   const currentStatLabels = pPos === 'GK'
@@ -126,7 +133,7 @@ function App() {
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #555; }
         table { border-collapse: collapse; border-radius: 8px; overflow: hidden; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        th, td { border: 1px solid ${theme.border}; padding: 12px; text-align: left; }
+        th, td { border: 1px solid ${theme.border}; padding: 12px; text-align: left; vertical-align: middle; }
         th { background-color: #1e2330; color: ${theme.accentNeon}; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 13px; }
         tr:nth-child(even) { background-color: #12151c; }
         tr:nth-child(odd) { background-color: ${theme.bgCard}; }
@@ -145,7 +152,7 @@ function App() {
             </div>}
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
-              <button onClick={() => { if(window.confirm('Wipe auction history, rosters, and budgets?')) socket.emit('resetAuction'); }} style={{ ...btnStyle, background: '#2c3e50', color: '#fff' }}>🔄 Restart Auction</button>
+              <button onClick={() => { if(window.confirm('Wipe history, rosters, and budgets?')) socket.emit('resetAuction'); }} style={{ ...btnStyle, background: '#2c3e50', color: '#fff' }}>🔄 Restart Season</button>
               <button onClick={() => { if(window.confirm('Completely wipe everything?')) { localStorage.clear(); setMyManagerName(''); socket.emit('resetEntireGame'); } }} style={{ ...btnStyle, background: '#c0392b', color: '#fff' }}>🗑️ Hard Reset</button>
           </div>
       </div>
@@ -191,7 +198,7 @@ function App() {
           <h3 style={{ marginTop: 0, color: theme.accentNeon, textTransform: 'uppercase', letterSpacing: '1px' }}>1. Manager Headquarters</h3>
           
           <div style={{ marginBottom: '20px', padding: '12px', background: 'rgba(255, 215, 0, 0.05)', border: `1px solid ${theme.accentGold}`, borderRadius: '6px', color: theme.accentGold, fontSize: '14px' }}>
-              <strong>🌐 PLAYING ONLINE?</strong> Do NOT register your friends here! Send them the website link and have them join from their own devices. Once everyone is in the list below, click an <strong>Online</strong> game mode!
+              <strong>🌐 PLAYING ONLINE?</strong> Do NOT register your friends here! Send them the website link and have them join from their own devices. Once everyone is in the list below, select a system and mode!
           </div>
 
           <div style={{ display: 'flex', gap: '15px', marginBottom: '25px', maxWidth: '600px' }}>
@@ -207,23 +214,59 @@ function App() {
           </div>
           
           <div style={{ borderTop: `1px solid ${theme.border}`, paddingTop: '20px' }}>
-            <h4 style={{ color: theme.textMuted, marginBottom: '15px' }}>SELECT GAMEMODE TO INITIATE AUCTION:</h4>
+            
+            {/* SYSTEM SELECTION UI */}
+            <h4 style={{ color: theme.textMuted, marginBottom: '15px', textTransform: 'uppercase' }}>Step 1: Select Game System</h4>
+            <div style={{ display: 'flex', gap: '15px', marginBottom: '25px', maxWidth: '600px' }}>
+                <button onClick={() => setSystemSelection('Auction')} 
+                    style={{ ...btnStyle, flex: 1, padding: '15px', background: systemSelection === 'Auction' ? 'rgba(255, 215, 0, 0.1)' : '#0b0e14', color: systemSelection === 'Auction' ? theme.accentGold : '#fff', border: `1px solid ${systemSelection === 'Auction' ? theme.accentGold : '#333'}` }}>
+                    💰 Auction Mode<br/><span style={{fontSize: '11px', fontWeight: 'normal', color: theme.textMuted}}>Budget-based bidding wars</span>
+                </button>
+                <button onClick={() => setSystemSelection('Draft')} 
+                    style={{ ...btnStyle, flex: 1, padding: '15px', background: systemSelection === 'Draft' ? 'rgba(0, 255, 135, 0.1)' : '#0b0e14', color: systemSelection === 'Draft' ? theme.accentNeon : '#fff', border: `1px solid ${systemSelection === 'Draft' ? theme.accentNeon : '#333'}` }}>
+                    🐍 Snake Draft Mode<br/><span style={{fontSize: '11px', fontWeight: 'normal', color: theme.textMuted}}>Strategic turn-based drafting</span>
+                </button>
+            </div>
+
+            <h4 style={{ color: theme.textMuted, marginBottom: '15px', textTransform: 'uppercase' }}>Step 2: Launch Gamemode</h4>
             <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-                <button onClick={() => socket.emit('startGame', 'Pass & Play Casual')} style={{ ...btnStyle, background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>🎮 Pass & Play Casual</button>
-                <button onClick={() => socket.emit('startGame', 'Pass & Play Tournament')} style={{ ...btnStyle, background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>🏆 Pass & Play Tournament (3-16P)</button>
-                <button onClick={() => socket.emit('startGame', 'Online Match')} style={{ ...btnStyle, background: '#00b8ff', color: '#000' }}>🌐 Online Match (2P)</button>
-                <button onClick={() => socket.emit('startGame', 'Online Tournament')} style={{ ...btnStyle, background: '#8a2be2', color: '#fff' }}>🌐 Online Tournament (3-16P)</button>
+                <button onClick={() => socket.emit('startGame', { mode: 'Pass & Play Casual', system: systemSelection })} style={{ ...btnStyle, background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>🎮 Pass & Play Casual</button>
+                <button onClick={() => socket.emit('startGame', { mode: 'Pass & Play Tournament', system: systemSelection })} style={{ ...btnStyle, background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>🏆 Pass & Play Tournament (3-16P)</button>
+                <button onClick={() => socket.emit('startGame', { mode: 'Online Match', system: systemSelection })} style={{ ...btnStyle, background: '#00b8ff', color: '#000' }}>🌐 Online Match (2P)</button>
+                <button onClick={() => socket.emit('startGame', { mode: 'Online Tournament', system: systemSelection })} style={{ ...btnStyle, background: '#8a2be2', color: '#fff' }}>🌐 Online Tournament (3-16P)</button>
             </div>
           </div>
         </section>
       )}
 
+      {/* DRAFT TIMER HERO UI */}
+      {gameState.auctionStatus === "Active" && isDraftMode && (
+          <div style={{ padding: '20px', background: 'linear-gradient(145deg, #151922, #1a1a1a)', border: `2px solid ${theme.accentNeon}`, borderRadius: '12px', textAlign: 'center', marginBottom: '25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: `0 0 20px rgba(0, 255, 135, 0.15)` }}>
+              <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: '14px', color: theme.textMuted, textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1px' }}>Current Draft Pick</div>
+                  <strong style={{ fontSize: '2rem', color: '#fff', textTransform: 'uppercase' }}>{activeManagerName}</strong>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                  <h1 style={{ margin: 0, fontSize: '3rem', color: timeLeft <= 15 ? theme.alertRed : theme.accentNeon, textShadow: `0 0 10px ${timeLeft <= 15 ? 'rgba(255,0,0,0.5)' : 'rgba(0,255,135,0.3)'}` }}>
+                      {timeLeft}s
+                  </h1>
+              </div>
+          </div>
+      )}
+
       {/* MANAGER TRACKERS */}
       <section>
-        <h3 style={{ marginTop: 0, color: theme.accentNeon, textTransform: 'uppercase' }}>Live Manager Hub {gameState.gameMode && <span style={{ color: theme.textMuted, fontSize: '14px', textTransform: 'none' }}>— {gameState.gameMode}</span>}</h3>
+        <h3 style={{ marginTop: 0, color: theme.accentNeon, textTransform: 'uppercase' }}>Live Manager Hub {gameState.gameMode && <span style={{ color: theme.textMuted, fontSize: '14px', textTransform: 'none' }}>— {gameState.gameMode} ({gameState.draftSystem})</span>}</h3>
         <table>
           <thead>
-            <tr><th>Manager</th><th>Formation</th><th>Transfer Budget</th><th>Roster</th><th>Status</th><th>Actions</th></tr>
+            <tr>
+                <th>Manager</th>
+                <th>Formation</th>
+                {gameState.draftSystem === "Auction" && <th>Budget</th>}
+                <th>Roster</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
           </thead>
           <tbody>
             {Object.entries(gameState.managers).map(([name, data]) => (
@@ -233,12 +276,20 @@ function App() {
                     {activeManagerName === name && <span style={{ marginLeft: '10px', fontSize: '12px', background: theme.accentNeon, color: '#000', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>ON CLOCK</span>}
                 </td>
                 <td>{data.Formation}</td>
-                <td style={{ fontFamily: 'monospace', fontSize: '16px', color: theme.accentGold }}>€{data.Budget.toLocaleString()}</td>
+                {gameState.draftSystem === "Auction" && <td style={{ fontFamily: 'monospace', fontSize: '16px', color: theme.accentGold }}>€{data.Budget.toLocaleString()}</td>}
                 <td>{data.Roster.length}/18</td>
                 <td><span style={{ color: data.Status === 'Active' ? theme.accentNeon : theme.textMuted }}>{data.Status}</span></td>
                 <td>
                     <button onClick={() => setViewRosterMgr(viewRosterMgr === name ? null : name)} style={{ ...btnStyle, padding: '6px 12px', background: '#2c3e50', color: '#fff', fontSize: '12px' }}>View Squad</button>
                     {gameState.auctionStatus === "Lobby" && <button onClick={() => socket.emit('removeManager', name)} style={{ background: 'none', border: 'none', color: theme.alertRed, cursor: 'pointer', marginLeft: '10px', fontSize: '16px' }}>✖</button>}
+                    
+                    {/* NEW: DRAFT PASS TOGGLE */}
+                    {gameState.auctionStatus === "Active" && isDraftMode && data.Roster.length >= 11 && (isOnlineMode ? name === myManagerName : true) && (
+                        <label style={{ marginLeft: '10px', display: 'inline-flex', alignItems: 'center', gap: '5px', cursor: 'pointer', background: data.isDraftPassed ? 'rgba(255,0,0,0.1)' : 'rgba(255,255,255,0.05)', padding: '6px 10px', borderRadius: '4px', border: `1px solid ${data.isDraftPassed ? theme.alertRed : '#444'}` }}>
+                            <input type="checkbox" checked={data.isDraftPassed || false} onChange={(e) => socket.emit('toggleDraftPass', { mgrName: name, isPassing: e.target.checked })} style={{ accentColor: theme.alertRed }} />
+                            <span style={{ color: data.isDraftPassed ? theme.alertRed : '#fff', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>{data.isDraftPassed ? 'Sitting Out' : 'Pass Draft'}</span>
+                        </label>
+                    )}
                 </td>
               </tr>
             ))}
@@ -276,7 +327,6 @@ function App() {
               </div>
           </div>
           
-          {/* PRIVATE SCOUTING LOGIC FOR ONLINE MODE */}
           {!isMyTurn ? (
             <div style={{ padding: '50px 20px', background: '#0b0e14', borderRadius: '8px', textAlign: 'center', border: `1px solid ${theme.border}`, boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5)' }}>
                 <div style={{ fontSize: '40px', marginBottom: '15px' }}>🕵️‍♂️</div>
@@ -305,7 +355,8 @@ function App() {
                       </optgroup>
                   ))}
                 </select>
-                <input type="text" placeholder="Transfermarkt Price (€)" value={pValue} onChange={(e) => setPValue(formatCurrency(e.target.value))} style={inputStyle} />
+                {/* Hide Transfer Value in Draft Mode to keep UI clean */}
+                {!isDraftMode && <input type="text" placeholder="Transfermarkt Price (€)" value={pValue} onChange={(e) => setPValue(formatCurrency(e.target.value))} style={inputStyle} />}
               </div>
               
               <div style={{ marginTop: '25px', padding: '20px', background: '#0b0e14', borderRadius: '8px', border: `1px solid ${theme.border}` }}>
@@ -326,15 +377,15 @@ function App() {
               </div>
 
               <button onClick={handlePlayerSubmit} disabled={!!gameState.cardOnBlock} style={{ ...btnStyle, background: `linear-gradient(90deg, ${theme.accentNeon}, #00b8ff)`, color: '#000', width: '100%', marginTop: '20px', padding: '15px', fontSize: '16px', textTransform: 'uppercase', letterSpacing: '1px', boxShadow: `0 4px 15px rgba(0, 255, 135, 0.3)` }}>
-                Generate Card & Launch Auction
+                {isDraftMode ? 'GENERATE CARD & DRAFT PLAYER' : 'GENERATE CARD & LAUNCH AUCTION'}
               </button>
             </>
           )}
         </section>
       )}
 
-      {/* AUCTION BLOCK - GOLD THEME */}
-      {gameState.cardOnBlock && (
+      {/* AUCTION BLOCK - GOLD THEME (ONLY RENDERS IN AUCTION MODE) */}
+      {gameState.cardOnBlock && !isDraftMode && (
         <section style={{ border: `2px solid ${theme.accentGold}`, boxShadow: `0 0 20px rgba(255, 215, 0, 0.15)`, background: 'linear-gradient(145deg, #151922, #1a1a1a)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
@@ -360,8 +411,6 @@ function App() {
               <div>
                   <div style={{ color: theme.textMuted, fontSize: '12px', textTransform: 'uppercase' }}>OVR Attributes</div>
                   <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
-                      
-                      {/* ATTACK STAT RENDER */}
                       {gameState.cardOnBlock.CardType !== "Base Card" && gameState.cardOnBlock.Attack !== gameState.cardOnBlock.BaseAttack ? (
                           <>
                               <span style={{ color: theme.textMuted, fontSize: '14px', textDecoration: 'line-through' }}>{gameState.cardOnBlock.BaseAttack}</span>{' '}
@@ -370,10 +419,7 @@ function App() {
                       ) : (
                           <span style={{ color: '#00b8ff' }}>ATK {gameState.cardOnBlock.Attack}</span>
                       )}
-
                       <span style={{ color: '#444', margin: '0 8px' }}>|</span>
-
-                      {/* DEFENCE STAT RENDER */}
                       {gameState.cardOnBlock.CardType !== "Base Card" && gameState.cardOnBlock.Defence !== gameState.cardOnBlock.BaseDefence ? (
                           <>
                               <span style={{ color: theme.textMuted, fontSize: '14px', textDecoration: 'line-through' }}>{gameState.cardOnBlock.BaseDefence}</span>{' '}
@@ -382,7 +428,6 @@ function App() {
                       ) : (
                           <span style={{ color: theme.alertRed }}>DEF {gameState.cardOnBlock.Defence}</span>
                       )}
-
                   </div>
               </div>
           </div>
@@ -406,59 +451,33 @@ function App() {
               .map(name => {
                   const isHighestBidder = gameState.cardOnBlock.highestBidder === name;
                   const hasPassed = gameState.cardOnBlock.passedManagers?.includes(name);
-                  
-                  // Restricts bidding to ONLY your console if playing Online
                   const isMyConsole = isOnlineMode ? name === myManagerName : true;
 
                   return (
                     <div key={name} style={{ flex: 1, minWidth: '250px', border: `1px solid ${hasPassed ? '#333' : (isMyConsole ? theme.accentNeon : theme.border)}`, padding: '20px', borderRadius: '8px', background: isMyConsole ? '#11151c' : '#0b0e14', opacity: hasPassed ? 0.6 : 1, transition: '0.3s', position: 'relative' }}>
-                        
-                        {/* Identify "Your Console" visually during Online Mode */}
                         {isMyConsole && isOnlineMode && (
                             <div style={{ position: 'absolute', top: '-10px', left: '20px', background: theme.accentNeon, color: '#000', fontSize: '11px', fontWeight: 'bold', padding: '2px 8px', borderRadius: '4px', textTransform: 'uppercase' }}>YOUR CONSOLE</div>
                         )}
-
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', marginTop: isMyConsole && isOnlineMode ? '5px' : '0' }}>
                             <strong style={{ fontSize: '18px', color: '#fff', textDecoration: hasPassed ? 'line-through' : 'none' }}>{name}</strong>
                             <span style={{ color: theme.accentGold, fontFamily: 'monospace' }}>€{gameState.managers[name].Budget.toLocaleString()}</span>
                         </div>
-                        
                         {isMyConsole ? (
                             <>
                                 <div style={{ marginBottom: '12px' }}>
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: isHighestBidder ? 'not-allowed' : 'pointer', opacity: isHighestBidder ? 0.4 : 1 }}>
-                                        <input 
-                                            type="checkbox" 
-                                            checked={hasPassed || false}
-                                            disabled={isHighestBidder}
-                                            onChange={(e) => togglePass(name, e.target.checked)}
-                                            style={{ accentColor: theme.alertRed, width: '16px', height: '16px', cursor: isHighestBidder ? 'not-allowed' : 'pointer' }}
-                                        />
-                                        <span style={{ color: hasPassed ? theme.alertRed : theme.textMuted, fontWeight: hasPassed ? 'bold' : 'normal', fontSize: '13px', textTransform: 'uppercase' }}>
-                                            {hasPassed ? "Passed (Out of Auction)" : "Pass on Player"}
-                                        </span>
+                                        <input type="checkbox" checked={hasPassed || false} disabled={isHighestBidder} onChange={(e) => togglePass(name, e.target.checked)} style={{ accentColor: theme.alertRed, width: '16px', height: '16px', cursor: isHighestBidder ? 'not-allowed' : 'pointer' }} />
+                                        <span style={{ color: hasPassed ? theme.alertRed : theme.textMuted, fontWeight: hasPassed ? 'bold' : 'normal', fontSize: '13px', textTransform: 'uppercase' }}>{hasPassed ? "Passed (Out of Auction)" : "Pass on Player"}</span>
                                     </label>
                                 </div>
-
                                 <div style={{ display: 'flex', gap: '10px' }}>
-                                    <input type="text" placeholder={hasPassed ? "PASSED" : "Enter bid..."} 
-                                        disabled={hasPassed}
-                                        value={managerBids[name] || ''} 
-                                        onChange={(e) => setManagerBids({...managerBids, [name]: formatCurrency(e.target.value)})} 
-                                        style={{ ...inputStyle, background: '#1a1a1a', cursor: hasPassed ? 'not-allowed' : 'text' }} />
+                                    <input type="text" placeholder={hasPassed ? "PASSED" : "Enter bid..."} disabled={hasPassed} value={managerBids[name] || ''} onChange={(e) => setManagerBids({...managerBids, [name]: formatCurrency(e.target.value)})} style={{ ...inputStyle, background: '#1a1a1a', cursor: hasPassed ? 'not-allowed' : 'text' }} />
                                     <button onClick={() => submitBid(name)} disabled={hasPassed} style={{ ...btnStyle, background: hasPassed ? '#444' : theme.accentNeon, width: '80px', color: hasPassed ? '#888' : '#000', cursor: hasPassed ? 'not-allowed' : 'pointer' }}>BID</button>
                                 </div>
                             </>
                         ) : (
-                            // OPPONENT CONSOLE - READ ONLY
                             <div style={{ height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: `1px dashed ${theme.border}` }}>
-                                {hasPassed ? (
-                                    <span style={{ color: theme.alertRed, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>🚫 Passed</span>
-                                ) : isHighestBidder ? (
-                                    <span style={{ color: theme.accentGold, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>👑 Leading Bid</span>
-                                ) : (
-                                    <span style={{ color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '1px', fontSize: '13px' }}>⏳ Evaluating...</span>
-                                )}
+                                {hasPassed ? <span style={{ color: theme.alertRed, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>🚫 Passed</span> : isHighestBidder ? <span style={{ color: theme.accentGold, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>👑 Leading Bid</span> : <span style={{ color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '1px', fontSize: '13px' }}>⏳ Evaluating...</span>}
                             </div>
                         )}
                     </div>
@@ -472,7 +491,7 @@ function App() {
       {gameState.auctionStatus === "Completed" && (
           <section style={{ border: `2px solid ${theme.accentNeon}`, boxShadow: `0 0 15px rgba(0, 255, 135, 0.1)` }}>
               <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-                <h2 style={{ color: theme.accentNeon, margin: '0 0 10px 0', textTransform: 'uppercase', fontSize: '2.5rem' }}>Transfer Window Closed</h2>
+                <h2 style={{ color: theme.accentNeon, margin: '0 0 10px 0', textTransform: 'uppercase', fontSize: '2.5rem' }}>{isDraftMode ? 'Draft Concluded' : 'Transfer Window Closed'}</h2>
                 <p style={{ color: theme.textMuted, fontSize: '16px' }}>Select exactly 11 players for your Starting XI. The rest will move to the bench.</p>
               </div>
 
@@ -507,7 +526,6 @@ function App() {
                 </div>
               )}
               
-              {/* Only maps over your own personal manager profile if playing Online Mode */}
               {Object.entries(gameState.managers)
                 .filter(([name]) => isOnlineMode ? name === myManagerName : true)
                 .map(([name, data]) => {
