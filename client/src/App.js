@@ -42,7 +42,6 @@ function App() {
   const [myManagerName, setMyManagerName] = useState(localStorage.getItem('myManagerName') || '');
   const [timeLeft, setTimeLeft] = useState(0);
   
-  // NEW: Lobby System Selection
   const [systemSelection, setSystemSelection] = useState('Auction');
   
   const [regName, setRegName] = useState('');
@@ -117,6 +116,9 @@ function App() {
   const isDraftMode = gameState.draftSystem === "Draft";
   const activeManagerName = isDraftMode ? gameState.activeDraftManager : (gameState.turnOrder[gameState.currentTurnIndex] || "");
   const isMyTurn = isOnlineMode ? myManagerName === activeManagerName : true;
+
+  // NEW: Dynamic budget visibility based on lobby selection OR active game mode
+  const showBudget = gameState.auctionStatus === "Lobby" ? systemSelection === 'Auction' : gameState.draftSystem === 'Auction';
 
   const currentStatLabels = pPos === 'GK'
       ? [ { key: 's4', label: 'DIV' }, { key: 's6', label: 'HAN' }, { key: 's1', label: 'KIC' }, { key: 's3', label: 'REF' }, { key: 's2', label: 'SPD' }, { key: 's5', label: 'POS' } ]
@@ -262,7 +264,7 @@ function App() {
             <tr>
                 <th>Manager</th>
                 <th>Formation</th>
-                {gameState.draftSystem === "Auction" && <th>Budget</th>}
+                {showBudget && <th>Budget</th>}
                 <th>Roster</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -276,14 +278,14 @@ function App() {
                     {activeManagerName === name && <span style={{ marginLeft: '10px', fontSize: '12px', background: theme.accentNeon, color: '#000', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>ON CLOCK</span>}
                 </td>
                 <td>{data.Formation}</td>
-                {gameState.draftSystem === "Auction" && <td style={{ fontFamily: 'monospace', fontSize: '16px', color: theme.accentGold }}>€{data.Budget.toLocaleString()}</td>}
+                {showBudget && <td style={{ fontFamily: 'monospace', fontSize: '16px', color: theme.accentGold }}>€{data.Budget.toLocaleString()}</td>}
                 <td>{data.Roster.length}/18</td>
                 <td><span style={{ color: data.Status === 'Active' ? theme.accentNeon : theme.textMuted }}>{data.Status}</span></td>
                 <td>
                     <button onClick={() => setViewRosterMgr(viewRosterMgr === name ? null : name)} style={{ ...btnStyle, padding: '6px 12px', background: '#2c3e50', color: '#fff', fontSize: '12px' }}>View Squad</button>
                     {gameState.auctionStatus === "Lobby" && <button onClick={() => socket.emit('removeManager', name)} style={{ background: 'none', border: 'none', color: theme.alertRed, cursor: 'pointer', marginLeft: '10px', fontSize: '16px' }}>✖</button>}
                     
-                    {/* NEW: DRAFT PASS TOGGLE */}
+                    {/* DRAFT PASS TOGGLE */}
                     {gameState.auctionStatus === "Active" && isDraftMode && data.Roster.length >= 11 && (isOnlineMode ? name === myManagerName : true) && (
                         <label style={{ marginLeft: '10px', display: 'inline-flex', alignItems: 'center', gap: '5px', cursor: 'pointer', background: data.isDraftPassed ? 'rgba(255,0,0,0.1)' : 'rgba(255,255,255,0.05)', padding: '6px 10px', borderRadius: '4px', border: `1px solid ${data.isDraftPassed ? theme.alertRed : '#444'}` }}>
                             <input type="checkbox" checked={data.isDraftPassed || false} onChange={(e) => socket.emit('toggleDraftPass', { mgrName: name, isPassing: e.target.checked })} style={{ accentColor: theme.alertRed }} />
@@ -327,6 +329,7 @@ function App() {
               </div>
           </div>
           
+          {/* PRIVATE SCOUTING LOGIC FOR ONLINE MODE */}
           {!isMyTurn ? (
             <div style={{ padding: '50px 20px', background: '#0b0e14', borderRadius: '8px', textAlign: 'center', border: `1px solid ${theme.border}`, boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5)' }}>
                 <div style={{ fontSize: '40px', marginBottom: '15px' }}>🕵️‍♂️</div>
