@@ -23,12 +23,11 @@ let gameState = {
     soldPlayers: [], 
     cardOnBlock: null,
     gameMode: null,
-    draftSystem: "Auction", // NEW: "Auction" or "Draft"
+    draftSystem: "Auction",
     turnOrder: [],
     currentTurnIndex: 0,
     auctionStatus: "Lobby",
     bracket: null,
-    // Draft specific tracking
     draftRound: 1,
     draftPick: -1,
     activeDraftManager: null
@@ -167,6 +166,7 @@ function advanceDraftTurn() {
         if (mgr && mgr.Roster.length < 18 && !mgr.isDraftPassed) {
             gameState.activeDraftManager = mgrName;
             found = true;
+            io.emit('updateState', gameState);
             startDraftTimer();
         }
         attempts++;
@@ -293,15 +293,15 @@ io.on('connection', (socket) => {
     });
 
     socket.on('startGame', (data) => {
-        // Fallback checks for older clients
         let mode = typeof data === 'string' ? data : data.mode;
         let system = typeof data === 'string' ? "Auction" : (data.system || "Auction");
 
         const mgrCount = Object.keys(gameState.managers).length;
         if (mgrCount < 2) return socket.emit('auctionError', "You need at least 2 players to start a game!");
 
-        if (mode.includes("Casual") && mgrCount !== 2) {
-            return socket.emit('auctionError', "Casual modes require exactly 2 players!");
+        // STRICT MODE VALIDATION
+        if ((mode.includes("Casual") || mode.includes("Match")) && mgrCount !== 2) {
+            return socket.emit('auctionError', "Head-to-head matches require exactly 2 players!");
         }
         if (mode.includes("Tournament") && mgrCount > 16) {
             return socket.emit('auctionError', "Tournaments support a maximum of 16 players.");
@@ -333,7 +333,8 @@ io.on('connection', (socket) => {
             gameState.draftRound = 1;
             gameState.draftPick = -1;
             gameState.activeDraftManager = null;
-            advanceDraftTurn();
+            advanceDraftTurn(); 
+            io.emit('updateState', gameState); // FAILSAFE: Guarantees the screen updates!
         } else {
             gameState.currentTurnIndex = 0;
             io.emit('updateState', gameState);
