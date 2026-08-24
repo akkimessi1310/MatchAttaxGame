@@ -38,7 +38,7 @@ const btnStyle = {
 };
 
 function App() {
-  const [gameState, setGameState] = useState({ managers: {}, auctionHistory: [], cardOnBlock: null, turnOrder: [], currentTurnIndex: 0, auctionStatus: "Lobby" });
+  const [gameState, setGameState] = useState({ managers: {}, auctionHistory: [], cardOnBlock: null, turnOrder: [], currentTurnIndex: 0, auctionStatus: "Lobby", bracket: null });
   const [myManagerName, setMyManagerName] = useState(localStorage.getItem('myManagerName') || '');
   const [timeLeft, setTimeLeft] = useState(0);
   const [regName, setRegName] = useState('');
@@ -210,9 +210,9 @@ function App() {
             <h4 style={{ color: theme.textMuted, marginBottom: '15px' }}>SELECT GAMEMODE TO INITIATE AUCTION:</h4>
             <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
                 <button onClick={() => socket.emit('startGame', 'Pass & Play Casual')} style={{ ...btnStyle, background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>🎮 Pass & Play Casual</button>
-                <button onClick={() => socket.emit('startGame', 'Pass & Play Tournament')} style={{ ...btnStyle, background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>🏆 Pass & Play Tournament</button>
+                <button onClick={() => socket.emit('startGame', 'Pass & Play Tournament')} style={{ ...btnStyle, background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>🏆 Pass & Play Tournament (3-16P)</button>
                 <button onClick={() => socket.emit('startGame', 'Online Match')} style={{ ...btnStyle, background: '#00b8ff', color: '#000' }}>🌐 Online Match (2P)</button>
-                <button onClick={() => socket.emit('startGame', 'Online Tournament')} style={{ ...btnStyle, background: '#8a2be2', color: '#fff' }}>🌐 Online Tournament (4-16P)</button>
+                <button onClick={() => socket.emit('startGame', 'Online Tournament')} style={{ ...btnStyle, background: '#8a2be2', color: '#fff' }}>🌐 Online Tournament (3-16P)</button>
             </div>
           </div>
         </section>
@@ -407,7 +407,7 @@ function App() {
                   const isHighestBidder = gameState.cardOnBlock.highestBidder === name;
                   const hasPassed = gameState.cardOnBlock.passedManagers?.includes(name);
                   
-                  // NEW LOGIC: Restricts bidding to ONLY your console if playing Online
+                  // Restricts bidding to ONLY your console if playing Online
                   const isMyConsole = isOnlineMode ? name === myManagerName : true;
 
                   return (
@@ -468,13 +468,44 @@ function App() {
         </section>
       )}
 
-      {/* PRIVATE SQUAD BUILDER / COMPLETED SCREEN */}
+      {/* COMPLETED SCREEN / SQUAD BUILDER */}
       {gameState.auctionStatus === "Completed" && (
           <section style={{ border: `2px solid ${theme.accentNeon}`, boxShadow: `0 0 15px rgba(0, 255, 135, 0.1)` }}>
               <div style={{ textAlign: 'center', marginBottom: '30px' }}>
                 <h2 style={{ color: theme.accentNeon, margin: '0 0 10px 0', textTransform: 'uppercase', fontSize: '2.5rem' }}>Transfer Window Closed</h2>
                 <p style={{ color: theme.textMuted, fontSize: '16px' }}>Select exactly 11 players for your Starting XI. The rest will move to the bench.</p>
               </div>
+
+              {/* TOURNAMENT BRACKET RENDER */}
+              {gameState.bracket && (
+                <div style={{ marginBottom: '30px', padding: '25px', background: '#0b0e14', borderRadius: '12px', border: `1px solid ${theme.accentGold}` }}>
+                    <h3 style={{ margin: '0 0 20px 0', color: theme.accentGold, textTransform: 'uppercase', textAlign: 'center', fontSize: '1.8rem' }}>🏆 Official Tournament Bracket</h3>
+                    
+                    {gameState.bracket.byes.length > 0 && (
+                        <div style={{ marginBottom: '25px' }}>
+                            <h4 style={{ color: theme.accentNeon, textTransform: 'uppercase', marginBottom: '10px' }}>🎟️ First-Round Byes (Auto-Advance)</h4>
+                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                {gameState.bracket.byes.map(p => (
+                                    <span key={p} style={{ padding: '8px 15px', background: 'rgba(0, 255, 135, 0.1)', border: `1px solid ${theme.accentNeon}`, borderRadius: '6px', color: '#fff', fontWeight: 'bold' }}>{p}</span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div>
+                        <h4 style={{ color: '#00b8ff', textTransform: 'uppercase', marginBottom: '10px' }}>⚔️ Round 1 Matchups</h4>
+                        <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                            {gameState.bracket.round1.map((match, idx) => (
+                                <div key={idx} style={{ flex: 1, minWidth: '250px', padding: '15px', background: '#151922', border: `1px solid ${theme.border}`, borderRadius: '8px', textAlign: 'center' }}>
+                                    <span style={{ color: '#fff', fontSize: '18px', fontWeight: 'bold' }}>{match[0]}</span>
+                                    <span style={{ color: theme.alertRed, margin: '0 15px', fontWeight: 'bold' }}>VS</span>
+                                    <span style={{ color: '#fff', fontSize: '18px', fontWeight: 'bold' }}>{match[1]}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+              )}
               
               {/* Only maps over your own personal manager profile if playing Online Mode */}
               {Object.entries(gameState.managers)

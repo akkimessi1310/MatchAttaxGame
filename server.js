@@ -25,7 +25,8 @@ let gameState = {
     gameMode: null,
     turnOrder: [],
     currentTurnIndex: 0,
-    auctionStatus: "Lobby" 
+    auctionStatus: "Lobby",
+    bracket: null // NEW: Stores the dynamically generated tournament bracket
 };
 
 let socketToManager = {};
@@ -79,7 +80,6 @@ function resolveAuction() {
             mgr.Budget -= card.highestBid;
             mgr.Roster.push({ ...card, isStarting: false });
             
-            // Only add to soldPlayers if actually sold
             gameState.soldPlayers.push(card.Name.toLowerCase());
 
             if (mgr.Budget <= 0) {
@@ -104,7 +104,6 @@ function resolveAuction() {
                 Player: card.Name, CardType: card.CardType, Rating: `${card.Attack}/${card.Defence}`, BasePrice: card.Value, FinalPrice: card.highestBid, Winner: card.highestBidder
             });
         } else {
-            // Unsold players are NOT pushed to gameState.soldPlayers, allowing them to return
             gameState.auctionHistory.push({
                 Player: card.Name, CardType: card.CardType, Rating: `${card.Attack}/${card.Defence}`, BasePrice: card.Value, FinalPrice: 0, Winner: "Unsold"
             });
@@ -145,7 +144,7 @@ io.on('connection', (socket) => {
     socket.emit('updateState', gameState);
 
     socket.on('resetEntireGame', () => {
-        gameState = { managers: {}, auctionHistory: [], soldPlayers: [], cardOnBlock: null, gameMode: null, turnOrder: [], currentTurnIndex: 0, auctionStatus: "Lobby" };
+        gameState = { managers: {}, auctionHistory: [], soldPlayers: [], cardOnBlock: null, gameMode: null, turnOrder: [], currentTurnIndex: 0, auctionStatus: "Lobby", bracket: null };
         socketToManager = {};
         clearInterval(timerInterval);
         io.emit('updateState', gameState);
@@ -164,6 +163,7 @@ io.on('connection', (socket) => {
         gameState.currentTurnIndex = 0;
         gameState.gameMode = null;
         gameState.auctionStatus = "Lobby";
+        gameState.bracket = null;
         clearInterval(timerInterval);
         io.emit('updateState', gameState);
     });
@@ -184,13 +184,14 @@ io.on('connection', (socket) => {
 
     socket.on('startGame', (mode) => {
         const mgrCount = Object.keys(gameState.managers).length;
-        if (mgrCount === 0) return;
+        if (mgrCount < 2) return socket.emit('auctionError', "You need at least 2 players to start a game!");
 
+        // NEW: Removed strict tournament limits to allow byes. 
         if (mode.includes("Casual") && mgrCount !== 2) {
             return socket.emit('auctionError', "Casual modes require exactly 2 players!");
         }
-        if (mode.includes("Tournament") && ![4, 8, 16].includes(mgrCount)) {
-            return socket.emit('auctionError', "Tournament modes require exactly 4, 8, or 16 players!");
+        if (mode.includes("Tournament") && mgrCount > 16) {
+            return socket.emit('auctionError', "Tournaments support a maximum of 16 players.");
         }
 
         gameState.gameMode = mode;
@@ -198,6 +199,33 @@ io.on('connection', (socket) => {
         gameState.turnOrder = managers.sort(() => Math.random() - 0.5);
         gameState.currentTurnIndex = 0;
         gameState.auctionStatus = "Active";
+
+        // NEW: BRACKET & BYE GENERATOR
+        if (mode.includes("Tournament")) {
+            // Find next power of 2 (e.g. 3 players -> 4. 5 players -> 8)
+            const nextPow2 = Math.pow(2, Math.ceil(Math.log2(mgrCount)));
+            const numByes = nextPow2 - mgrCount;
+            
+            // Randomly assign byes based on the shuffled turnOrder array
+            const byePlayers = gameState.turnOrder.slice(0, numByes);
+            const round1Players = gameState.turnOrder.slice(numByes);
+            
+            let matchups = [];
+            for(let i=0; i<round1Players.length; i+=2) {
+                if (round1Players[i+1]) {
+                    matchups.push([round1Players[i], round1Players[i+1]]);
+                }
+            }
+            
+            gameState.bracket = {
+                totalPlayers: mgrCount,
+                byes: byePlayers,
+                round1: matchups
+            };
+        } else {
+            gameState.bracket = null;
+        }
+
         io.emit('updateState', gameState);
     });
 
