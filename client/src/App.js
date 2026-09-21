@@ -40,6 +40,10 @@ const lightTheme = {
     btnGlass: 'rgba(0,0,0,0.05)', btnGlassBorder: 'rgba(0,0,0,0.1)', btnGlassText: '#000'
 };
 
+const inputStyle = {
+    padding: '10px', borderRadius: '6px', width: '100%', boxSizing: 'border-box'
+};
+
 const btnStyle = {
     padding: '10px 15px', border: 'none', borderRadius: '6px', fontWeight: 'bold', 
     cursor: 'pointer', transition: '0.2s', color: '#000'
@@ -142,7 +146,6 @@ function App() {
   return (
     <div style={{ padding: '30px 20px', fontFamily: '"Segoe UI", Tahoma, Geneva, Verdana, sans-serif', maxWidth: '1200px', margin: 'auto', minHeight: '100vh', color: theme.textMain, transition: 'background-color 0.3s' }}>
       
-      {/* GLOBAL STYLES BOUND TO THEME OBJECT */}
       <style>{`
         body { background-color: ${theme.bgMain}; margin: 0; color: ${theme.textMain}; transition: background-color 0.3s; }
         input:focus, select:focus { outline: 2px solid ${theme.accentNeon}; border-color: transparent !important; }
