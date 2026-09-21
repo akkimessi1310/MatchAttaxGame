@@ -421,8 +421,10 @@ io.on('connection', (socket) => {
         if ((mode.includes("Casual") || mode.includes("Match")) && mgrCount !== 2) {
             return socket.emit('auctionError', "Head-to-head matches require exactly 2 players!");
         }
-        if (mode.includes("Tournament") && mgrCount > 16) {
-            return socket.emit('auctionError', "Tournaments support a maximum of 16 players.");
+        
+        // Updated check: Restrict tournaments to 3-16 players
+        if (mode.includes("Tournament") && (mgrCount < 3 || mgrCount > 16)) {
+            return socket.emit('auctionError', "Only 3 to 16 players can play.");
         }
 
         game.state.gameMode = mode;
