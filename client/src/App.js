@@ -94,8 +94,13 @@ function App() {
         }
     });
     socket.on('managerRegistered', (name) => {
-        setMyManagerName(name);
-        localStorage.setItem('myManagerName', name);
+        setMyManagerName((prevName) => {
+            if (!prevName) {
+                localStorage.setItem('myManagerName', name);
+                return name;
+            }
+            return prevName; // Don't overwrite identity if adding local players
+        });
     });
     socket.on('timerTick', (time) => setTimeLeft(time));
     socket.on('auctionError', (msg) => alert("⚠️ " + msg)); 
@@ -286,19 +291,20 @@ function App() {
                 <strong>🌐 PLAYING ONLINE?</strong> Share Room Code <strong>{roomId}</strong> with friends. Wait for everyone to join before selecting a mode!
             </div>
 
-            {!myManagerName && (
-                <div style={{ display: 'flex', gap: '15px', marginBottom: '25px', maxWidth: '600px' }}>
-                    <input type="text" placeholder="Enter Manager Name" value={regName} onChange={(e) => setRegName(e.target.value)} style={inputStyleDynamic} />
-                    <select value={regFormation} onChange={(e) => setRegFormation(e.target.value)} style={{...inputStyleDynamic, width: '250px'}}>
-                        {FORMATIONS.map(form => <option key={form} value={form}>{form}</option>)}
-                    </select>
-                    <button onClick={() => { 
-                        if(regName.trim() === '') return;
-                        socket.emit('registerManager', { roomId, data: { name: regName, formation: regFormation } }); 
-                        setRegName(''); 
-                    }} style={{ ...btnStyle, background: theme.accentNeon, color: '#000', minWidth: '120px' }}>Join Match</button>
-                </div>
-            )}
+            {/* MANAGER REGISTRATION INPUT (Always visible for Pass & Play) */}
+            <div style={{ display: 'flex', gap: '15px', marginBottom: '25px', maxWidth: '600px' }}>
+                <input type="text" placeholder="Enter Manager Name" value={regName} onChange={(e) => setRegName(e.target.value)} style={inputStyleDynamic} />
+                <select value={regFormation} onChange={(e) => setRegFormation(e.target.value)} style={{...inputStyleDynamic, width: '250px'}}>
+                    {FORMATIONS.map(form => <option key={form} value={form}>{form}</option>)}
+                </select>
+                <button onClick={() => { 
+                    if(regName.trim() === '') return;
+                    socket.emit('registerManager', { roomId, data: { name: regName, formation: regFormation } }); 
+                    setRegName(''); 
+                }} style={{ ...btnStyle, background: theme.accentNeon, color: '#000', minWidth: '120px' }}>
+                    {myManagerName ? "Add Local Player" : "Join Match"}
+                </button>
+            </div>
             
             {/* Host Controls for launching the game */}
             {isHost && (

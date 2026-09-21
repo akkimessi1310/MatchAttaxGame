@@ -375,7 +375,11 @@ io.on('connection', (socket) => {
             // Assign Host
             if (!game.state.host) game.state.host = data.name;
             
-            socketToManager[socket.id] = data.name; 
+            // IMPORTANT: Only map the socket to the FIRST manager they create
+            if (!socketToManager[socket.id]) {
+                socketToManager[socket.id] = data.name; 
+            }
+            
             socket.emit('managerRegistered', data.name);
             io.to(roomId).emit('updateState', game.state);
         }
