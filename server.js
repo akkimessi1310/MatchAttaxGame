@@ -17,30 +17,39 @@ const UEFA_CLUBS = [
 const RARITY_TIERS = ["Base Card", "Man of the Match", "Wildcard", "All-Action Hero", "Heritage", "Counter Attax", "Stealth Strike", "100 Club", "101 Club", "Infinity"];
 const RARITY_WEIGHTS = [32.0, 15.0, 10.0, 10.0, 8.0, 8.0, 6.0, 5.0, 4.0, 2.0];
 
-let gameState = { 
-    managers: {}, 
-    auctionHistory: [], 
-    soldPlayers: [], 
-    cardOnBlock: null,
-    gameMode: null,
-    draftSystem: "Auction",
-    turnOrder: [],
-    currentTurnIndex: 0,
-    auctionStatus: "Lobby",
-    bracket: null,
-    draftRound: 1,
-    draftPick: -1,
-    activeDraftManager: null
-};
+// ==========================================
+// STATE MANAGEMENT (ROOM BASED)
+// ==========================================
+const activeGames = {}; // Maps roomId -> { state: gameStateObject, timer: intervalObject }
+const socketToRoom = {}; // Maps socket.id -> roomId
+const socketToManager = {}; // Maps socket.id -> managerName
 
-let socketToManager = {};
-let timerInterval;
+function createEmptyGameState() {
+    return { 
+        host: null, // Admin role
+        managers: {}, 
+        auctionHistory: [], 
+        soldPlayers: [], 
+        cardOnBlock: null,
+        gameMode: null,
+        draftSystem: "Auction",
+        turnOrder: [],
+        currentTurnIndex: 0,
+        auctionStatus: "Lobby",
+        bracket: null,
+        draftRound: 1,
+        draftPick: -1,
+        activeDraftManager: null,
+        draftTimeLeft: 180,
+        isTimerPaused: false
+    };
+}
 
+// Math Helpers (Unchanged)
 function calculateBaseStats(pos, atts) {
     let atk = 0, dfc = 0;
     const PAS = parseInt(atts.s1)||0, PAC = parseInt(atts.s2)||0, DRI = parseInt(atts.s3)||0, SHO = parseInt(atts.s4)||0;
     const DEF = parseInt(atts.s5)||0, PHY = parseInt(atts.s6)||0;
-
     if (pos === 'CB') { atk = Math.round(0.45*PAS + 0.30*PAC + 0.15*DRI + 0.10*SHO); dfc = Math.round(0.65*DEF + 0.25*PHY + 0.10*PAC); } 
     else if (['RB', 'LB'].includes(pos)) { atk = Math.round(0.35*PAC + 0.35*PAS + 0.20*DRI + 0.10*SHO); dfc = Math.round(0.50*DEF + 0.25*PHY + 0.25*PAC); } 
     else if (pos === 'CDM') { atk = Math.round(0.40*PAS + 0.25*DRI + 0.20*PAC + 0.15*SHO); dfc = Math.round(0.55*DEF + 0.35*PHY + 0.10*PAC); } 
@@ -76,46 +85,65 @@ function applyBoosts(card, pos, age, b_atk, b_def) {
     return { atk, dfc };
 }
 
-// ----------------------------------------------------
-// DRAFT ENGINE LOGIC
-// ----------------------------------------------------
-function checkDraftEnd() {
+// ==========================================
+// GAME ENGINE LOGIC (ROOM BASED)
+// ==========================================
+function checkDraftEnd(roomId) {
+    let game = activeGames[roomId];
+    if (!game) return false;
+
     let allDone = true;
-    for (let name of gameState.turnOrder) {
-        let mgr = gameState.managers[name];
+    for (let name of game.state.turnOrder) {
+        let mgr = game.state.managers[name];
         if (mgr && mgr.Roster.length < 18 && !mgr.isDraftPassed) {
             allDone = false;
             break;
         }
     }
     if (allDone) {
-        clearInterval(timerInterval);
-        gameState.auctionStatus = "Completed";
-        io.emit('updateState', gameState);
+        clearInterval(game.timer);
+        game.state.auctionStatus = "Completed";
+        io.to(roomId).emit('updateState', game.state);
         return true;
     }
     return false;
 }
 
-function startDraftTimer() {
-    clearInterval(timerInterval);
-    let timeLeft = 180;
-    io.emit('timerTick', timeLeft);
+function startDraftTimer(roomId, startingTime = 180) {
+    let game = activeGames[roomId];
+    if (!game) return;
+
+    clearInterval(game.timer);
+    game.state.draftTimeLeft = startingTime;
+    game.state.isTimerPaused = false;
+    io.to(roomId).emit('timerTick', game.state.draftTimeLeft);
     
-    timerInterval = setInterval(() => {
-        timeLeft--;
-        if (timeLeft <= 0) {
-            clearInterval(timerInterval);
-            autoDraftPunishment(gameState.activeDraftManager);
+    game.timer = setInterval(() => {
+        game.state.draftTimeLeft--;
+        if (game.state.draftTimeLeft <= 0) {
+            clearInterval(game.timer);
+            autoDraftPunishment(roomId, game.state.activeDraftManager);
         } else {
-            io.emit('timerTick', timeLeft);
+            io.to(roomId).emit('timerTick', game.state.draftTimeLeft);
         }
     }, 1000);
 }
 
-function autoDraftPunishment(mgrName) {
-    let mgr = gameState.managers[mgrName];
-    if (!mgr) return advanceDraftTurn();
+function pauseDraftTimer(roomId) {
+    let game = activeGames[roomId];
+    if (game && game.timer) {
+        clearInterval(game.timer);
+        game.state.isTimerPaused = true;
+        io.to(roomId).emit('updateState', game.state); 
+    }
+}
+
+function autoDraftPunishment(roomId, mgrName) {
+    let game = activeGames[roomId];
+    if (!game) return;
+
+    let mgr = game.state.managers[mgrName];
+    if (!mgr) return advanceDraftTurn(roomId);
     
     let punishmentCount = mgr.Roster.filter(p => p.Name.startsWith("Punishment Player")).length + 1;
     let pPlayer = {
@@ -125,69 +153,78 @@ function autoDraftPunishment(mgrName) {
     };
     
     mgr.Roster.push(pPlayer);
-    gameState.auctionHistory.push({
+    game.state.auctionHistory.push({
         Player: pPlayer.Name, CardType: pPlayer.CardType, Rating: `${pPlayer.Attack}/${pPlayer.Defence}`, BasePrice: 0, FinalPrice: "Punishment", Winner: mgrName
     });
     
-    io.emit('updateState', gameState);
-    advanceDraftTurn();
+    io.to(roomId).emit('updateState', game.state);
+    advanceDraftTurn(roomId);
 }
 
-function advanceDraftTurn() {
-    if (checkDraftEnd()) return;
+function advanceDraftTurn(roomId) {
+    let game = activeGames[roomId];
+    if (!game) return;
+
+    if (checkDraftEnd(roomId)) return;
 
     let found = false;
     let attempts = 0;
-    let maxAttempts = gameState.turnOrder.length * 20; 
+    let maxAttempts = game.state.turnOrder.length * 20; 
     
     while (!found && attempts < maxAttempts) {
-        gameState.draftPick++;
-        if (gameState.draftPick >= gameState.turnOrder.length) {
-            gameState.draftPick = 0;
-            gameState.draftRound++;
+        game.state.draftPick++;
+        if (game.state.draftPick >= game.state.turnOrder.length) {
+            game.state.draftPick = 0;
+            game.state.draftRound++;
         }
         
-        if (gameState.draftRound > 18) {
-            gameState.auctionStatus = "Completed";
-            clearInterval(timerInterval);
-            io.emit('updateState', gameState);
+        if (game.state.draftRound > 18) {
+            game.state.auctionStatus = "Completed";
+            clearInterval(game.timer);
+            io.to(roomId).emit('updateState', game.state);
             return;
         }
 
-        let index = gameState.draftRound % 2 !== 0 
-            ? gameState.draftPick 
-            : (gameState.turnOrder.length - 1 - gameState.draftPick); 
+        let index = game.state.draftRound % 2 !== 0 
+            ? game.state.draftPick 
+            : (game.state.turnOrder.length - 1 - game.state.draftPick); 
             
-        let mgrName = gameState.turnOrder[index];
-        let mgr = gameState.managers[mgrName];
+        let mgrName = game.state.turnOrder[index];
+        let mgr = game.state.managers[mgrName];
         
         if (mgr && mgr.Roster.length < 18 && !mgr.isDraftPassed) {
-            gameState.activeDraftManager = mgrName;
+            game.state.activeDraftManager = mgrName;
             found = true;
-            io.emit('updateState', gameState);
-            startDraftTimer();
+            io.to(roomId).emit('updateState', game.state);
+            
+            // If the person whose turn it is happens to be offline, pause immediately
+            if (mgr.isOnline === false) {
+                pauseDraftTimer(roomId);
+            } else {
+                startDraftTimer(roomId, 180);
+            }
         }
         attempts++;
     }
     
     if (!found) {
-        gameState.auctionStatus = "Completed";
-        clearInterval(timerInterval);
-        io.emit('updateState', gameState);
+        game.state.auctionStatus = "Completed";
+        clearInterval(game.timer);
+        io.to(roomId).emit('updateState', game.state);
     }
 }
 
-// ----------------------------------------------------
-// AUCTION ENGINE LOGIC
-// ----------------------------------------------------
-function resolveAuction() {
-    const card = gameState.cardOnBlock;
+function resolveAuction(roomId) {
+    let game = activeGames[roomId];
+    if (!game) return;
+
+    const card = game.state.cardOnBlock;
     if (card) {
         if (card.highestBidder) {
-            const mgr = gameState.managers[card.highestBidder];
+            const mgr = game.state.managers[card.highestBidder];
             mgr.Budget -= card.highestBid;
             mgr.Roster.push({ ...card, isStarting: false });
-            gameState.soldPlayers.push(card.Name.toLowerCase());
+            game.state.soldPlayers.push(card.Name.toLowerCase());
 
             if (mgr.Budget <= 0) {
                 let punishmentCount = mgr.Roster.filter(p => p.Name.startsWith("Punishment Player")).length + 1;
@@ -204,97 +241,177 @@ function resolveAuction() {
                 mgr.Status = "Auction Ended (Max 18 Players)";
             }
 
-            gameState.auctionHistory.push({
+            game.state.auctionHistory.push({
                 Player: card.Name, CardType: card.CardType, Rating: `${card.Attack}/${card.Defence}`, BasePrice: card.Value, FinalPrice: card.highestBid, Winner: card.highestBidder
             });
         } else {
-            gameState.auctionHistory.push({
+            game.state.auctionHistory.push({
                 Player: card.Name, CardType: card.CardType, Rating: `${card.Attack}/${card.Defence}`, BasePrice: card.Value, FinalPrice: 0, Winner: "Unsold"
             });
         }
     }
     
-    gameState.cardOnBlock = null;
-    gameState.currentTurnIndex = (gameState.currentTurnIndex + 1) % gameState.turnOrder.length;
+    game.state.cardOnBlock = null;
+    game.state.currentTurnIndex = (game.state.currentTurnIndex + 1) % game.state.turnOrder.length;
     
-    if (Object.values(gameState.managers).every(m => m.Status !== "Active")) {
-        gameState.auctionStatus = "Completed";
+    if (Object.values(game.state.managers).every(m => m.Status !== "Active")) {
+        game.state.auctionStatus = "Completed";
     }
-    io.emit('updateState', gameState);
+    io.to(roomId).emit('updateState', game.state);
 }
 
-function checkAuctionEndEarly() {
-    if (!gameState.cardOnBlock) return;
-    const activeMgrs = Object.keys(gameState.managers).filter(name => gameState.managers[name].Status === 'Active');
-    const passedCount = gameState.cardOnBlock.passedManagers.filter(m => activeMgrs.includes(m)).length;
+function checkAuctionEndEarly(roomId) {
+    let game = activeGames[roomId];
+    if (!game || !game.state.cardOnBlock) return;
+
+    const activeMgrs = Object.keys(game.state.managers).filter(name => game.state.managers[name].Status === 'Active');
+    const passedCount = game.state.cardOnBlock.passedManagers.filter(m => activeMgrs.includes(m)).length;
     let shouldEnd = false;
     
-    if (gameState.cardOnBlock.highestBidder) {
+    if (game.state.cardOnBlock.highestBidder) {
         if (passedCount >= activeMgrs.length - 1) shouldEnd = true;
     } else {
         if (passedCount >= activeMgrs.length) shouldEnd = true;
     }
 
     if (shouldEnd) {
-        clearInterval(timerInterval);
-        resolveAuction();
+        clearInterval(game.timer);
+        resolveAuction(roomId);
     }
 }
 
-// ----------------------------------------------------
+// ==========================================
 // SOCKET COMMUNICATION
-// ----------------------------------------------------
+// ==========================================
 io.on('connection', (socket) => {
-    socket.emit('updateState', gameState);
-
-    socket.on('resetEntireGame', () => {
-        gameState = { managers: {}, auctionHistory: [], soldPlayers: [], cardOnBlock: null, gameMode: null, draftSystem: "Auction", turnOrder: [], currentTurnIndex: 0, auctionStatus: "Lobby", bracket: null, draftRound: 1, draftPick: -1, activeDraftManager: null };
-        socketToManager = {};
-        clearInterval(timerInterval);
-        io.emit('updateState', gameState);
+    
+    // --- ROOM CREATION & JOINING ---
+    socket.on('createRoom', () => {
+        const roomId = Math.random().toString(36).substring(2, 6).toUpperCase(); 
+        activeGames[roomId] = { state: createEmptyGameState(), timer: null };
+        socket.join(roomId);
+        socketToRoom[socket.id] = roomId;
+        socket.emit('roomCreated', roomId);
+        io.to(roomId).emit('updateState', activeGames[roomId].state);
     });
 
-    socket.on('resetAuction', () => {
-        for (let m in gameState.managers) {
-            gameState.managers[m].Budget = 1000000000;
-            gameState.managers[m].Roster = [];
-            gameState.managers[m].Status = "Active";
-            gameState.managers[m].isDraftPassed = false;
+    socket.on('joinRoom', (roomId) => {
+        if(!roomId) return;
+        roomId = roomId.toUpperCase();
+        if (activeGames[roomId]) {
+            socket.join(roomId);
+            socketToRoom[socket.id] = roomId;
+            socket.emit('roomJoined', roomId);
+            io.to(roomId).emit('updateState', activeGames[roomId].state);
+        } else {
+            socket.emit('auctionError', "Room not found or has expired!");
         }
-        gameState.auctionHistory = [];
-        gameState.soldPlayers = [];
-        gameState.cardOnBlock = null;
-        gameState.turnOrder = [];
-        gameState.currentTurnIndex = 0;
-        gameState.gameMode = null;
-        gameState.auctionStatus = "Lobby";
-        gameState.bracket = null;
-        gameState.draftRound = 1;
-        gameState.draftPick = -1;
-        gameState.activeDraftManager = null;
-        clearInterval(timerInterval);
-        io.emit('updateState', gameState);
     });
 
-    socket.on('registerManager', (data) => {
-        if (data.name && !gameState.managers[data.name]) {
-            gameState.managers[data.name] = { Formation: data.formation, Budget: 1000000000, Roster: [], Status: "Active", isDraftPassed: false };
+    socket.on('reconnectUser', ({ roomId, mgrName }) => {
+        if (!roomId) return;
+        roomId = roomId.toUpperCase();
+        let game = activeGames[roomId];
+        
+        if (game) {
+            socket.join(roomId);
+            socketToRoom[socket.id] = roomId;
+            
+            if (mgrName && game.state.managers[mgrName]) {
+                socketToManager[socket.id] = mgrName;
+                game.state.managers[mgrName].isOnline = true; // Mark back online
+                
+                // If they are host, ensure host title persists (in case it dropped)
+                if(!game.state.host) game.state.host = mgrName;
+
+                // Resume draft timer if they were on the clock and it was paused
+                if (game.state.activeDraftManager === mgrName && game.state.isTimerPaused) {
+                    startDraftTimer(roomId, game.state.draftTimeLeft);
+                }
+            }
+            socket.emit('roomJoined', roomId);
+            socket.emit('updateState', game.state);
+        } else {
+            socket.emit('forceClearStorage'); // Tell client room is gone
+        }
+    });
+
+    socket.on('disconnect', () => {
+        const roomId = socketToRoom[socket.id];
+        const mgrName = socketToManager[socket.id];
+        
+        if (roomId && activeGames[roomId] && mgrName) {
+            let game = activeGames[roomId];
+            
+            if (game.state.managers[mgrName]) {
+                game.state.managers[mgrName].isOnline = false;
+                
+                // Pause draft timer if the active player leaves
+                if (game.state.activeDraftManager === mgrName && game.state.draftSystem === "Draft" && game.state.auctionStatus === "Active") {
+                    pauseDraftTimer(roomId);
+                }
+                io.to(roomId).emit('updateState', game.state);
+            }
+            
+            // Reassign host if the host leaves (optional safeguard)
+            if (game.state.host === mgrName) {
+                const remainingOnline = Object.keys(game.state.managers).find(name => game.state.managers[name].isOnline);
+                if(remainingOnline) game.state.host = remainingOnline;
+            }
+        }
+        
+        delete socketToRoom[socket.id];
+        delete socketToManager[socket.id];
+    });
+
+    // --- GAME ACTIONS ---
+    socket.on('registerManager', ({ roomId, data }) => {
+        let game = activeGames[roomId];
+        if (!game) return;
+        
+        if (data.name && !game.state.managers[data.name]) {
+            game.state.managers[data.name] = { Formation: data.formation, Budget: 1000000000, Roster: [], Status: "Active", isDraftPassed: false, isOnline: true };
+            
+            // Assign Host
+            if (!game.state.host) game.state.host = data.name;
+            
             socketToManager[socket.id] = data.name; 
             socket.emit('managerRegistered', data.name);
-            io.emit('updateState', gameState);
+            io.to(roomId).emit('updateState', game.state);
         }
     });
 
-    socket.on('removeManager', (name) => {
-        delete gameState.managers[name];
-        io.emit('updateState', gameState);
+    socket.on('resetAuction', ({ roomId }) => {
+        let game = activeGames[roomId];
+        if (!game) return;
+        
+        for (let m in game.state.managers) {
+            game.state.managers[m].Budget = 1000000000;
+            game.state.managers[m].Roster = [];
+            game.state.managers[m].Status = "Active";
+            game.state.managers[m].isDraftPassed = false;
+        }
+        game.state.auctionHistory = [];
+        game.state.soldPlayers = [];
+        game.state.cardOnBlock = null;
+        game.state.turnOrder = [];
+        game.state.currentTurnIndex = 0;
+        game.state.gameMode = null;
+        game.state.auctionStatus = "Lobby";
+        game.state.bracket = null;
+        game.state.draftRound = 1;
+        game.state.draftPick = -1;
+        game.state.activeDraftManager = null;
+        clearInterval(game.timer);
+        
+        io.to(roomId).emit('updateState', game.state);
     });
 
-    socket.on('startGame', (data) => {
-        let mode = typeof data === 'string' ? data : data.mode;
-        let system = typeof data === 'string' ? "Auction" : (data.system || "Auction");
+    socket.on('startGame', ({ roomId, mode, system }) => {
+        let game = activeGames[roomId];
+        if (!game) return;
 
-        const mgrCount = Object.keys(gameState.managers).length;
+        const mgrCount = Object.keys(game.state.managers).length;
         if (mgrCount < 2) return socket.emit('auctionError', "You need at least 2 players to start a game!");
 
         if ((mode.includes("Casual") || mode.includes("Match")) && mgrCount !== 2) {
@@ -304,41 +421,43 @@ io.on('connection', (socket) => {
             return socket.emit('auctionError', "Tournaments support a maximum of 16 players.");
         }
 
-        gameState.gameMode = mode;
-        gameState.draftSystem = system;
-        const managers = Object.keys(gameState.managers);
-        gameState.turnOrder = managers.sort(() => Math.random() - 0.5);
-        gameState.auctionStatus = "Active";
+        game.state.gameMode = mode;
+        game.state.draftSystem = system || "Auction";
+        const managers = Object.keys(game.state.managers);
+        game.state.turnOrder = managers.sort(() => Math.random() - 0.5);
+        game.state.auctionStatus = "Active";
 
         if (mode.includes("Tournament")) {
             const nextPow2 = Math.pow(2, Math.ceil(Math.log2(mgrCount)));
             const numByes = nextPow2 - mgrCount;
-            const byePlayers = gameState.turnOrder.slice(0, numByes);
-            const round1Players = gameState.turnOrder.slice(numByes);
+            const byePlayers = game.state.turnOrder.slice(0, numByes);
+            const round1Players = game.state.turnOrder.slice(numByes);
             
             let matchups = [];
             for(let i=0; i<round1Players.length; i+=2) {
                 if (round1Players[i+1]) matchups.push([round1Players[i], round1Players[i+1]]);
             }
-            gameState.bracket = { totalPlayers: mgrCount, byes: byePlayers, round1: matchups };
+            game.state.bracket = { totalPlayers: mgrCount, byes: byePlayers, round1: matchups };
         } else {
-            gameState.bracket = null;
+            game.state.bracket = null;
         }
 
-        if (system === "Draft") {
-            gameState.draftRound = 1;
-            gameState.draftPick = -1;
-            gameState.activeDraftManager = null;
-            advanceDraftTurn(); 
-            io.emit('updateState', gameState); 
+        if (game.state.draftSystem === "Draft") {
+            game.state.draftRound = 1;
+            game.state.draftPick = -1;
+            game.state.activeDraftManager = null;
+            advanceDraftTurn(roomId); 
         } else {
-            gameState.currentTurnIndex = 0;
-            io.emit('updateState', gameState);
+            game.state.currentTurnIndex = 0;
+            io.to(roomId).emit('updateState', game.state);
         }
     });
 
-    socket.on('submitPlayerEntry', (playerData) => {
-        if (gameState.soldPlayers.includes(playerData.name.toLowerCase())) {
+    socket.on('submitPlayerEntry', ({ roomId, ...playerData }) => {
+        let game = activeGames[roomId];
+        if (!game) return;
+
+        if (game.state.soldPlayers.includes(playerData.name.toLowerCase())) {
             return socket.emit('auctionError', `Player '${playerData.name}' has already been assigned to a team! No duplicates allowed.`);
         }
 
@@ -348,7 +467,6 @@ io.on('connection', (socket) => {
         const pos = playerData.position;
 
         let cardType = "Base Card";
-
         if (isUefa) {
             let eligibleTiers = [];
             let eligibleWeights = [];
@@ -372,9 +490,9 @@ io.on('connection', (socket) => {
         const rawVal = String(playerData.value).replace(/,/g, '');
         const { atk: f_atk, dfc: f_def } = applyBoosts(cardType, pos, age, b_atk, b_def);
 
-        if (gameState.draftSystem === "Draft") {
-            let mgrName = gameState.activeDraftManager;
-            let mgr = gameState.managers[mgrName];
+        if (game.state.draftSystem === "Draft") {
+            let mgrName = game.state.activeDraftManager;
+            let mgr = game.state.managers[mgrName];
             if (!mgr) return;
             
             let newPlayer = {
@@ -384,99 +502,126 @@ io.on('connection', (socket) => {
             };
             
             mgr.Roster.push(newPlayer);
-            gameState.soldPlayers.push(playerData.name.toLowerCase());
-            gameState.auctionHistory.push({
+            game.state.soldPlayers.push(playerData.name.toLowerCase());
+            game.state.auctionHistory.push({
                 Player: newPlayer.Name, CardType: newPlayer.CardType, Rating: `${newPlayer.Attack}/${newPlayer.Defence}`, BasePrice: newPlayer.Value, FinalPrice: "Drafted", Winner: mgrName
             });
             
-            io.emit('updateState', gameState);
-            advanceDraftTurn();
+            io.to(roomId).emit('updateState', game.state);
+            advanceDraftTurn(roomId);
 
         } else {
-            gameState.cardOnBlock = {
+            game.state.cardOnBlock = {
                 Name: playerData.name, Position: pos, Club: playerData.club, CardType: cardType, 
                 Attack: f_atk, Defence: f_def, BaseAttack: b_atk, BaseDefence: b_def, 
                 Value: parseInt(rawVal) || 1000000, highestBid: 0, highestBidder: null, timeLeft: 180, passedManagers: []
             };
-            io.emit('updateState', gameState);
+            io.to(roomId).emit('updateState', game.state);
 
-            clearInterval(timerInterval);
-            timerInterval = setInterval(() => {
-                if (!gameState.cardOnBlock) { clearInterval(timerInterval); return; }
-                gameState.cardOnBlock.timeLeft -= 1;
-                if (gameState.cardOnBlock.timeLeft <= 0) {
-                    clearInterval(timerInterval);
-                    resolveAuction();
+            clearInterval(game.timer);
+            game.timer = setInterval(() => {
+                if (!game.state.cardOnBlock) { clearInterval(game.timer); return; }
+                game.state.cardOnBlock.timeLeft -= 1;
+                if (game.state.cardOnBlock.timeLeft <= 0) {
+                    clearInterval(game.timer);
+                    resolveAuction(roomId);
                 } else {
-                    io.emit('timerTick', gameState.cardOnBlock.timeLeft);
+                    io.to(roomId).emit('timerTick', game.state.cardOnBlock.timeLeft);
                 }
             }, 1000);
         }
     });
 
-    socket.on('toggleDraftPass', (data) => {
-        const { mgrName, isPassing } = data;
-        let mgr = gameState.managers[mgrName];
+    socket.on('toggleDraftPass', ({ roomId, mgrName, isPassing }) => {
+        let game = activeGames[roomId];
+        if (!game) return;
+        let mgr = game.state.managers[mgrName];
         if (!mgr || mgr.Roster.length < 11) return;
         
         mgr.isDraftPassed = isPassing;
-        io.emit('updateState', gameState);
+        io.to(roomId).emit('updateState', game.state);
         
-        if (isPassing && gameState.activeDraftManager === mgrName) {
-            advanceDraftTurn();
-        } else {
-            checkDraftEnd();
-        }
+        if (isPassing && game.state.activeDraftManager === mgrName) advanceDraftTurn(roomId);
+        else checkDraftEnd(roomId);
     });
 
-    socket.on('togglePass', (data) => {
-        if (gameState.draftSystem === "Draft") return;
-        const { mgrName, isPassing } = data;
-        if (!gameState.cardOnBlock || !gameState.managers[mgrName]) return;
+    socket.on('togglePass', ({ roomId, mgrName, isPassing }) => {
+        let game = activeGames[roomId];
+        if (!game || game.state.draftSystem === "Draft" || !game.state.cardOnBlock || !game.state.managers[mgrName]) return;
         
-        if (gameState.cardOnBlock.highestBidder === mgrName) {
+        if (game.state.cardOnBlock.highestBidder === mgrName) {
             return socket.emit('auctionError', "You cannot pass while holding the highest bid!");
         }
 
         if (isPassing) {
-            if (!gameState.cardOnBlock.passedManagers.includes(mgrName)) gameState.cardOnBlock.passedManagers.push(mgrName);
+            if (!game.state.cardOnBlock.passedManagers.includes(mgrName)) game.state.cardOnBlock.passedManagers.push(mgrName);
         } else {
-            gameState.cardOnBlock.passedManagers = gameState.cardOnBlock.passedManagers.filter(m => m !== mgrName);
+            game.state.cardOnBlock.passedManagers = game.state.cardOnBlock.passedManagers.filter(m => m !== mgrName);
         }
 
-        io.emit('updateState', gameState);
-        checkAuctionEndEarly(); 
+        io.to(roomId).emit('updateState', game.state);
+        checkAuctionEndEarly(roomId); 
     });
 
-    socket.on('placeBid', (data) => {
-        if (gameState.draftSystem === "Draft") return;
-        const { mgrName, bidAmount } = data;
-        const mgr = gameState.managers[mgrName];
+    socket.on('placeBid', ({ roomId, mgrName, bidAmount }) => {
+        let game = activeGames[roomId];
+        if (!game || game.state.draftSystem === "Draft") return;
+        
+        const mgr = game.state.managers[mgrName];
         const bid = parseInt(String(bidAmount).replace(/,/g, ''));
 
-        if (mgr && gameState.cardOnBlock && mgr.Status === "Active") {
-            if (gameState.cardOnBlock.passedManagers.includes(mgrName)) return socket.emit('auctionError', "You have passed on this player! Toggle 'Pass' off to bid again.");
+        if (mgr && game.state.cardOnBlock && mgr.Status === "Active") {
+            if (game.state.cardOnBlock.passedManagers.includes(mgrName)) return socket.emit('auctionError', "You have passed on this player! Toggle 'Pass' off to bid again.");
             if (bid < 1000000) return socket.emit('auctionError', "Minimum bid is €1,000,000.");
             if (bid > mgr.Budget) return socket.emit('auctionError', "You do not have enough budget for that bid!");
             
-            if (bid > gameState.cardOnBlock.highestBid) {
-                gameState.cardOnBlock.highestBid = bid;
-                gameState.cardOnBlock.highestBidder = mgrName;
-                if (gameState.cardOnBlock.timeLeft <= 10) {
-                    gameState.cardOnBlock.timeLeft = 10;
-                    io.emit('timerTick', 10);
+            if (bid > game.state.cardOnBlock.highestBid) {
+                game.state.cardOnBlock.highestBid = bid;
+                game.state.cardOnBlock.highestBidder = mgrName;
+                if (game.state.cardOnBlock.timeLeft <= 10) {
+                    game.state.cardOnBlock.timeLeft = 10;
+                    io.to(roomId).emit('timerTick', 10);
                 }
-                io.emit('updateState', gameState);
-                checkAuctionEndEarly();
+                io.to(roomId).emit('updateState', game.state);
+                checkAuctionEndEarly(roomId);
             }
         }
     });
     
-    socket.on('toggleStarter', ({ mgrName, playerIndex, isStarting }) => {
-        if (gameState.managers[mgrName] && gameState.managers[mgrName].Roster[playerIndex]) {
-            gameState.managers[mgrName].Roster[playerIndex].isStarting = isStarting;
-            io.emit('updateState', gameState);
+    socket.on('toggleStarter', ({ roomId, mgrName, playerIndex, isStarting }) => {
+        let game = activeGames[roomId];
+        if (game && game.state.managers[mgrName] && game.state.managers[mgrName].Roster[playerIndex]) {
+            game.state.managers[mgrName].Roster[playerIndex].isStarting = isStarting;
+            io.to(roomId).emit('updateState', game.state);
         }
+    });
+
+    // --- ADMIN / HOST CONTROLS ---
+    socket.on('adminSkipTurn', ({ roomId }) => {
+        let game = activeGames[roomId];
+        if (!game) return;
+        const requester = socketToManager[socket.id];
+        if (game.state.host !== requester) return; // Only host
+
+        if (game.state.draftSystem === "Draft" && game.state.activeDraftManager) {
+            autoDraftPunishment(roomId, game.state.activeDraftManager);
+        } else if (game.state.cardOnBlock) {
+            game.state.cardOnBlock.timeLeft = 0; 
+        }
+    });
+
+    socket.on('adminKickPlayer', ({ roomId, targetName }) => {
+        let game = activeGames[roomId];
+        if (!game) return;
+        const requester = socketToManager[socket.id];
+        if (game.state.host !== requester || targetName === requester) return; 
+
+        delete game.state.managers[targetName];
+        game.state.turnOrder = game.state.turnOrder.filter(name => name !== targetName);
+        
+        if (game.state.activeDraftManager === targetName) advanceDraftTurn(roomId);
+        
+        io.to(roomId).emit('updateState', game.state);
     });
 });
 
