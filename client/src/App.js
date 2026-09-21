@@ -11,9 +11,9 @@ const FORMATIONS = [
 ];
 
 const UEFA_CLUBS = {
-    "Champions League": ["Ajax", "Arsenal", "Atalanta (Bergamo Calcio)", "Athletic Bilbao", "Atlético Madrid", "Barcelona", "Bayer Leverkusen", "Bayern Munich", "Benfica", "Bodø/Glimt", "Borussia Dortmund", "Chelsea", "Club Brugge", "Copenhagen", "Eintracht Frankfurt", "Galatasaray", "Inter Milan (Lombardia FC)", "Juventus", "Liverpool", "Manchester City", "Marseille", "Monaco", "Napoli", "Newcastle United", "Olympiacos", "Paris Saint-Germain", "PSV Eindhoven", "Qarabağ", "Real Madrid", "Slavia Prague", "Sporting CP", "Tottenham Hotspur", "Union Saint-Gilloise", "Villarreal"],
-    "Europa League": ["Aston Villa", "Basel", "Bologna", "Braga", "Brann", "Celta Vigo", "Celtic", "Dinamo Zagreb", "FCSB", "Fenerbahçe", "Ferencváros", "Feyenoord", "Genk", "Go Ahead Eagles", "Lille", "Lyon", "Malmö FF", "Midtjylland", "Nice", "Nottingham Forest", "Panathinaikos", "PAOK", "Porto", "Rangers", "Real Betis", "Red Bull Salzburg", "Roma", "SC Freiburg", "Sturm Graz", "Utrecht", "VfB Stuttgart", "Viktoria Plzeň", "Young Boys"],
-    "Conference League": ["Aberdeen", "AEK Athens", "AZ", "BK Häcken", "Crystal Palace", "Dynamo Kyiv", "Fiorentina", "Jagiellonia Białystok", "Lausanne-Sport", "Lech Poznań", "Legia Warsaw", "Mainz 05", "Raków Częstochowa", "Rapid Wien", "Rayo Vallecano", "Samsunspor", "Shakhtar Donetsk", "Shamrock Rovers", "Shelbourne", "Sparta Prague", "Strasbourg", "Universitatea Craiova"]
+    "Champions League": ["AEK Athens", "Arsenal", "Aston Villa", "Atlético Madrid", "Barcelona", "Bayern Munich", "Bodø/Glimt", "Borussia Dortmund", "Club Brugge", "Como", "Fenerbahçe", "Feyenoord", "Galatasaray", "Inter Milan (Lombardia FC)", "LASK", "Lens", "Lille", "Liverpool", "Manchester City", "Manchester United", "Napoli", "Paris Saint-Germain", "Porto", "PSV Eindhoven", "RB Leipzig", "Real Betis", "Real Madrid", "Roma", "Shakhtar Donetsk", "Slavia Prague", "Sporting CP", "VfB Stuttgart", "Viking", "Villarreal"],
+    "Europa League": ["Anderlecht", "AZ", "Bayer Leverkusen", "Benfica", "Beşiktaş", "Bournemouth", "Celta Vigo", "Celtic", "Crystal Palace", "Dinamo Zagreb", "Ferencváros", "Jagiellonia Białystok", "Juventus", "Lech Poznań", "Lillestrøm", "Lyon", "Marseille", "Milan (Milano FC)", "NEC", "Olympiacos", "Real Sociedad", "Red Bull Salzburg", "Rennes", "Sparta Prague", "Sturm Graz", "Sunderland", "Torreense", "TSG Hoffenheim", "Union Saint-Gilloise", "Viktoria Plzeň"],
+    "Conference League": ["AGF", "Ajax", "Atalanta (Bergamo Calcio)", "Braga", "Brann", "Brighton & Hove Albion", "Copenhagen", "Gent", "Getafe", "Hajduk Split", "Heart of Midlothian", "Lugano", "Midtjylland", "Mjällby AIF", "Monaco", "Nordsjælland", "Panathinaikos", "SC Freiburg", "Sint-Truiden", "Thun", "Trabzonspor", "Twente", "Universitatea Craiova"]
 };
 
 const formatCurrency = (val) => {
@@ -21,15 +21,23 @@ const formatCurrency = (val) => {
     return onlyNums ? Number(onlyNums).toLocaleString('en-US') : '';
 };
 
-// Premium Theme Colors
-const theme = {
-    bgMain: '#0b0e14', bgCard: '#151922', accentNeon: '#00ff87', accentGold: '#FFD700', 
-    textMain: '#f0f2f5', textMuted: '#a0aabc', border: '#2a2d34', alertRed: '#ff4d4d'
+// --- DYNAMIC THEME PALETTES ---
+const darkTheme = {
+    bgMain: '#0b0e14', bgCard: '#151922', bgInput: '#1a1a1a',
+    accentNeon: '#00ff87', accentGold: '#FFD700', 
+    textMain: '#f0f2f5', textMuted: '#a0aabc', textStrong: '#fff', textAtk: '#00b8ff',
+    border: '#2a2d34', alertRed: '#ff4d4d', thBg: '#1e2330', rowEven: '#12151c',
+    bgGoldLight: 'rgba(255, 215, 0, 0.05)', bgNeonLight: 'rgba(0, 255, 135, 0.1)', bgRedLight: 'rgba(255, 0, 0, 0.1)',
+    btnGlass: 'rgba(255,255,255,0.1)', btnGlassBorder: 'rgba(255,255,255,0.2)', btnGlassText: '#fff'
 };
 
-const inputStyle = {
-    backgroundColor: '#0b0e14', color: theme.textMain, border: `1px solid ${theme.border}`, 
-    padding: '10px', borderRadius: '6px', width: '100%', boxSizing: 'border-box'
+const lightTheme = {
+    bgMain: '#f0f2f5', bgCard: '#ffffff', bgInput: '#ffffff',
+    accentNeon: '#00a859', accentGold: '#d4af37', 
+    textMain: '#1a1a2e', textMuted: '#5a6270', textStrong: '#000', textAtk: '#0077b6',
+    border: '#d1d5db', alertRed: '#e63946', thBg: '#e2e8f0', rowEven: '#f8fafc',
+    bgGoldLight: 'rgba(212, 175, 55, 0.1)', bgNeonLight: 'rgba(0, 168, 89, 0.1)', bgRedLight: 'rgba(230, 57, 70, 0.1)',
+    btnGlass: 'rgba(0,0,0,0.05)', btnGlassBorder: 'rgba(0,0,0,0.1)', btnGlassText: '#000'
 };
 
 const btnStyle = {
@@ -42,8 +50,11 @@ function App() {
   const [myManagerName, setMyManagerName] = useState(localStorage.getItem('myManagerName') || '');
   const [timeLeft, setTimeLeft] = useState(0);
   
+  // NEW: Dark/Light Mode State with Local Storage persistence
+  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('themeMode') !== 'light');
+  const theme = isDarkMode ? darkTheme : lightTheme;
+
   const [systemSelection, setSystemSelection] = useState('Auction');
-  
   const [regName, setRegName] = useState('');
   const [regFormation, setRegFormation] = useState(FORMATIONS[0]);
   
@@ -77,6 +88,11 @@ function App() {
         socket.off('auctionError');
     };
   }, []);
+
+  const toggleTheme = () => {
+      setIsDarkMode(!isDarkMode);
+      localStorage.setItem('themeMode', !isDarkMode ? 'dark' : 'light');
+  };
 
   const handlePlayerSubmit = () => {
     socket.emit('submitPlayerEntry', { name: pName, position: pPos, age: pAge, club: pClub, value: pValue, stats });
@@ -116,30 +132,31 @@ function App() {
   const isDraftMode = gameState.draftSystem === "Draft";
   const activeManagerName = isDraftMode ? gameState.activeDraftManager : (gameState.turnOrder[gameState.currentTurnIndex] || "");
   const isMyTurn = isOnlineMode ? myManagerName === activeManagerName : true;
-
-  // NEW: Dynamic budget visibility based on lobby selection OR active game mode
   const showBudget = gameState.auctionStatus === "Lobby" ? systemSelection === 'Auction' : gameState.draftSystem === 'Auction';
 
   const currentStatLabels = pPos === 'GK'
       ? [ { key: 's4', label: 'DIV' }, { key: 's6', label: 'HAN' }, { key: 's1', label: 'KIC' }, { key: 's3', label: 'REF' }, { key: 's2', label: 'SPD' }, { key: 's5', label: 'POS' } ]
       : [ { key: 's2', label: 'PAC' }, { key: 's4', label: 'SHO' }, { key: 's1', label: 'PAS' }, { key: 's3', label: 'DRI' }, { key: 's5', label: 'DEF' }, { key: 's6', label: 'PHY' } ];
 
+  const inputStyleDynamic = { ...inputStyle, backgroundColor: theme.bgInput, color: theme.textMain, border: `1px solid ${theme.border}` };
+
   return (
-    <div style={{ padding: '30px 20px', fontFamily: '"Segoe UI", Tahoma, Geneva, Verdana, sans-serif', maxWidth: '1200px', margin: 'auto', minHeight: '100vh', color: theme.textMain }}>
+    <div style={{ padding: '30px 20px', fontFamily: '"Segoe UI", Tahoma, Geneva, Verdana, sans-serif', maxWidth: '1200px', margin: 'auto', minHeight: '100vh', color: theme.textMain, transition: 'background-color 0.3s' }}>
       
+      {/* GLOBAL STYLES BOUND TO THEME OBJECT */}
       <style>{`
-        body { background-color: ${theme.bgMain}; margin: 0; color: ${theme.textMain}; }
+        body { background-color: ${theme.bgMain}; margin: 0; color: ${theme.textMain}; transition: background-color 0.3s; }
         input:focus, select:focus { outline: 2px solid ${theme.accentNeon}; border-color: transparent !important; }
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: ${theme.bgMain}; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #555; }
-        table { border-collapse: collapse; border-radius: 8px; overflow: hidden; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #777; }
+        table { border-collapse: collapse; border-radius: 8px; overflow: hidden; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         th, td { border: 1px solid ${theme.border}; padding: 12px; text-align: left; vertical-align: middle; }
-        th { background-color: #1e2330; color: ${theme.accentNeon}; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 13px; }
-        tr:nth-child(even) { background-color: #12151c; }
+        th { background-color: ${theme.thBg}; color: ${theme.accentNeon}; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 13px; }
+        tr:nth-child(even) { background-color: ${theme.rowEven}; }
         tr:nth-child(odd) { background-color: ${theme.bgCard}; }
-        section { background-color: ${theme.bgCard}; border-radius: 12px; border: 1px solid ${theme.border}; box-shadow: 0 8px 16px rgba(0,0,0,0.4); padding: 25px; margin-bottom: 25px; }
+        section { background-color: ${theme.bgCard}; border-radius: 12px; border: 1px solid ${theme.border}; box-shadow: 0 8px 16px rgba(0,0,0,0.1); padding: 25px; margin-bottom: 25px; transition: background-color 0.3s; }
       `}</style>
 
       {/* HEADER SECTION */}
@@ -150,20 +167,23 @@ function App() {
             </h1>
             {myManagerName && <div style={{ marginTop: '8px', color: theme.textMuted, fontSize: '14px' }}>
                 <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: theme.accentNeon, marginRight: '8px', boxShadow: `0 0 8px ${theme.accentNeon}` }}></span>
-                Connected as: <strong style={{ color: '#fff' }}>{myManagerName}</strong>
+                Connected as: <strong style={{ color: theme.textStrong }}>{myManagerName}</strong>
             </div>}
           </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <button onClick={toggleTheme} style={{ ...btnStyle, background: theme.bgInput, color: theme.textStrong, border: `1px solid ${theme.border}`, fontSize: '16px', padding: '8px 12px' }} title="Toggle Dark/Light Mode">
+                  {isDarkMode ? '☀️' : '🌙'}
+              </button>
               <button onClick={() => { if(window.confirm('Wipe history, rosters, and budgets?')) socket.emit('resetAuction'); }} style={{ ...btnStyle, background: '#2c3e50', color: '#fff' }}>🔄 Restart Season</button>
               <button onClick={() => { if(window.confirm('Completely wipe everything?')) { localStorage.clear(); setMyManagerName(''); socket.emit('resetEntireGame'); } }} style={{ ...btnStyle, background: '#c0392b', color: '#fff' }}>🗑️ Hard Reset</button>
           </div>
       </div>
 
-      <div style={{ marginBottom: '20px', padding: '15px', background: 'rgba(0, 255, 135, 0.05)', borderRadius: '8px', border: `1px solid rgba(0, 255, 135, 0.2)`, display: 'flex', gap: '20px', fontSize: '14px' }}>
+      <div style={{ marginBottom: '20px', padding: '15px', background: theme.bgNeonLight, borderRadius: '8px', border: `1px solid rgba(0, 255, 135, 0.2)`, display: 'flex', gap: '20px', fontSize: '14px' }}>
         <strong style={{ color: theme.accentNeon }}>🌐 Databases:</strong>
-        <a href="https://sofifa.com/players" target="_blank" rel="noreferrer" style={{ color: '#00b8ff', textDecoration: 'none', fontWeight: '500' }}>SoFIFA</a>
-        <a href="https://www.transfermarkt.co.uk/spieler-statistik/wertvollstespieler/marktwertetop" target="_blank" rel="noreferrer" style={{ color: '#00b8ff', textDecoration: 'none', fontWeight: '500' }}>Transfermarkt</a>
-        <a href="https://www.fifplay.com/fc-26/formations/?mode=kickoff" target="_blank" rel="noreferrer" style={{ color: '#00b8ff', textDecoration: 'none', fontWeight: '500' }}>Formations Guide</a>
+        <a href="https://sofifa.com/players" target="_blank" rel="noreferrer" style={{ color: theme.textAtk, textDecoration: 'none', fontWeight: '500' }}>SoFIFA</a>
+        <a href="https://www.transfermarkt.co.uk/spieler-statistik/wertvollstespieler/marktwertetop" target="_blank" rel="noreferrer" style={{ color: theme.textAtk, textDecoration: 'none', fontWeight: '500' }}>Transfermarkt</a>
+        <a href="https://www.fifplay.com/fc-26/formations/?mode=kickoff" target="_blank" rel="noreferrer" style={{ color: theme.textAtk, textDecoration: 'none', fontWeight: '500' }}>Formations Guide</a>
       </div>
 
       <details style={{ marginBottom: '30px', padding: '15px', background: theme.bgCard, borderRadius: '8px', border: `1px solid ${theme.border}`, cursor: 'pointer' }}>
@@ -199,41 +219,40 @@ function App() {
         <section>
           <h3 style={{ marginTop: 0, color: theme.accentNeon, textTransform: 'uppercase', letterSpacing: '1px' }}>1. Manager Headquarters</h3>
           
-          <div style={{ marginBottom: '20px', padding: '12px', background: 'rgba(255, 215, 0, 0.05)', border: `1px solid ${theme.accentGold}`, borderRadius: '6px', color: theme.accentGold, fontSize: '14px' }}>
+          <div style={{ marginBottom: '20px', padding: '12px', background: theme.bgGoldLight, border: `1px solid ${theme.accentGold}`, borderRadius: '6px', color: theme.accentGold, fontSize: '14px' }}>
               <strong>🌐 PLAYING ONLINE?</strong> Do NOT register your friends here! Send them the website link and have them join from their own devices. Once everyone is in the list below, select a system and mode!
           </div>
 
           <div style={{ display: 'flex', gap: '15px', marginBottom: '25px', maxWidth: '600px' }}>
-              <input type="text" placeholder="Enter Manager Name" value={regName} onChange={(e) => setRegName(e.target.value)} style={inputStyle} />
-              <select value={regFormation} onChange={(e) => setRegFormation(e.target.value)} style={{...inputStyle, width: '250px'}}>
+              <input type="text" placeholder="Enter Manager Name" value={regName} onChange={(e) => setRegName(e.target.value)} style={inputStyleDynamic} />
+              <select value={regFormation} onChange={(e) => setRegFormation(e.target.value)} style={{...inputStyleDynamic, width: '250px'}}>
                 {FORMATIONS.map(form => <option key={form} value={form}>{form}</option>)}
               </select>
               <button onClick={() => { 
                   if(regName.trim() === '') return;
                   socket.emit('registerManager', { name: regName, formation: regFormation }); 
                   setRegName(''); 
-              }} style={{ ...btnStyle, background: theme.accentNeon, minWidth: '120px' }}>Join Lobby</button>
+              }} style={{ ...btnStyle, background: theme.accentNeon, color: '#000', minWidth: '120px' }}>Join Lobby</button>
           </div>
           
           <div style={{ borderTop: `1px solid ${theme.border}`, paddingTop: '20px' }}>
             
-            {/* SYSTEM SELECTION UI */}
             <h4 style={{ color: theme.textMuted, marginBottom: '15px', textTransform: 'uppercase' }}>Step 1: Select Game System</h4>
             <div style={{ display: 'flex', gap: '15px', marginBottom: '25px', maxWidth: '600px' }}>
                 <button onClick={() => setSystemSelection('Auction')} 
-                    style={{ ...btnStyle, flex: 1, padding: '15px', background: systemSelection === 'Auction' ? 'rgba(255, 215, 0, 0.1)' : '#0b0e14', color: systemSelection === 'Auction' ? theme.accentGold : '#fff', border: `1px solid ${systemSelection === 'Auction' ? theme.accentGold : '#333'}` }}>
+                    style={{ ...btnStyle, flex: 1, padding: '15px', background: systemSelection === 'Auction' ? theme.bgGoldLight : theme.bgInput, color: systemSelection === 'Auction' ? theme.accentGold : theme.textStrong, border: `1px solid ${systemSelection === 'Auction' ? theme.accentGold : theme.border}` }}>
                     💰 Auction Mode<br/><span style={{fontSize: '11px', fontWeight: 'normal', color: theme.textMuted}}>Budget-based bidding wars</span>
                 </button>
                 <button onClick={() => setSystemSelection('Draft')} 
-                    style={{ ...btnStyle, flex: 1, padding: '15px', background: systemSelection === 'Draft' ? 'rgba(0, 255, 135, 0.1)' : '#0b0e14', color: systemSelection === 'Draft' ? theme.accentNeon : '#fff', border: `1px solid ${systemSelection === 'Draft' ? theme.accentNeon : '#333'}` }}>
+                    style={{ ...btnStyle, flex: 1, padding: '15px', background: systemSelection === 'Draft' ? theme.bgNeonLight : theme.bgInput, color: systemSelection === 'Draft' ? theme.accentNeon : theme.textStrong, border: `1px solid ${systemSelection === 'Draft' ? theme.accentNeon : theme.border}` }}>
                     🐍 Snake Draft Mode<br/><span style={{fontSize: '11px', fontWeight: 'normal', color: theme.textMuted}}>Strategic turn-based drafting</span>
                 </button>
             </div>
 
             <h4 style={{ color: theme.textMuted, marginBottom: '15px', textTransform: 'uppercase' }}>Step 2: Launch Gamemode</h4>
             <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-                <button onClick={() => socket.emit('startGame', { mode: 'Pass & Play Casual', system: systemSelection })} style={{ ...btnStyle, background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>🎮 Pass & Play Casual</button>
-                <button onClick={() => socket.emit('startGame', { mode: 'Pass & Play Tournament', system: systemSelection })} style={{ ...btnStyle, background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>🏆 Pass & Play Tournament (3-16P)</button>
+                <button onClick={() => socket.emit('startGame', { mode: 'Pass & Play Casual', system: systemSelection })} style={{ ...btnStyle, background: theme.btnGlass, color: theme.btnGlassText, border: `1px solid ${theme.btnGlassBorder}` }}>🎮 Pass & Play Casual</button>
+                <button onClick={() => socket.emit('startGame', { mode: 'Pass & Play Tournament', system: systemSelection })} style={{ ...btnStyle, background: theme.btnGlass, color: theme.btnGlassText, border: `1px solid ${theme.btnGlassBorder}` }}>🏆 Pass & Play Tournament (3-16P)</button>
                 <button onClick={() => socket.emit('startGame', { mode: 'Online Match', system: systemSelection })} style={{ ...btnStyle, background: '#00b8ff', color: '#000' }}>🌐 Online Match (2P)</button>
                 <button onClick={() => socket.emit('startGame', { mode: 'Online Tournament', system: systemSelection })} style={{ ...btnStyle, background: '#8a2be2', color: '#fff' }}>🌐 Online Tournament (3-16P)</button>
             </div>
@@ -243,13 +262,13 @@ function App() {
 
       {/* DRAFT TIMER HERO UI */}
       {gameState.auctionStatus === "Active" && isDraftMode && (
-          <div style={{ padding: '20px', background: 'linear-gradient(145deg, #151922, #1a1a1a)', border: `2px solid ${theme.accentNeon}`, borderRadius: '12px', textAlign: 'center', marginBottom: '25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: `0 0 20px rgba(0, 255, 135, 0.15)` }}>
+          <div style={{ padding: '20px', background: theme.bgCard, border: `2px solid ${theme.accentNeon}`, borderRadius: '12px', textAlign: 'center', marginBottom: '25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: `0 0 20px rgba(0, 255, 135, 0.15)` }}>
               <div style={{ textAlign: 'left' }}>
                   <div style={{ fontSize: '14px', color: theme.textMuted, textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1px' }}>Current Draft Pick</div>
-                  <strong style={{ fontSize: '2rem', color: '#fff', textTransform: 'uppercase' }}>{activeManagerName}</strong>
+                  <strong style={{ fontSize: '2rem', color: theme.textStrong, textTransform: 'uppercase' }}>{activeManagerName}</strong>
               </div>
               <div style={{ textAlign: 'right' }}>
-                  <h1 style={{ margin: 0, fontSize: '3rem', color: timeLeft <= 15 ? theme.alertRed : theme.accentNeon, textShadow: `0 0 10px ${timeLeft <= 15 ? 'rgba(255,0,0,0.5)' : 'rgba(0,255,135,0.3)'}` }}>
+                  <h1 style={{ margin: 0, fontSize: '3rem', color: timeLeft <= 15 ? theme.alertRed : theme.accentNeon, textShadow: isDarkMode ? `0 0 10px ${timeLeft <= 15 ? 'rgba(255,0,0,0.5)' : 'rgba(0,255,135,0.3)'}` : 'none' }}>
                       {timeLeft}s
                   </h1>
               </div>
@@ -274,7 +293,7 @@ function App() {
             {Object.entries(gameState.managers).map(([name, data]) => (
               <tr key={name}>
                 <td>
-                    <strong style={{ color: activeManagerName === name ? theme.accentNeon : '#fff' }}>{name}</strong>
+                    <strong style={{ color: activeManagerName === name ? theme.accentNeon : theme.textStrong }}>{name}</strong>
                     {activeManagerName === name && <span style={{ marginLeft: '10px', fontSize: '12px', background: theme.accentNeon, color: '#000', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>ON CLOCK</span>}
                 </td>
                 <td>{data.Formation}</td>
@@ -282,14 +301,14 @@ function App() {
                 <td>{data.Roster.length}/18</td>
                 <td><span style={{ color: data.Status === 'Active' ? theme.accentNeon : theme.textMuted }}>{data.Status}</span></td>
                 <td>
-                    <button onClick={() => setViewRosterMgr(viewRosterMgr === name ? null : name)} style={{ ...btnStyle, padding: '6px 12px', background: '#2c3e50', color: '#fff', fontSize: '12px' }}>View Squad</button>
+                    <button onClick={() => setViewRosterMgr(viewRosterMgr === name ? null : name)} style={{ ...btnStyle, padding: '6px 12px', background: theme.btnGlass, color: theme.btnGlassText, border: `1px solid ${theme.border}`, fontSize: '12px' }}>View Squad</button>
                     {gameState.auctionStatus === "Lobby" && <button onClick={() => socket.emit('removeManager', name)} style={{ background: 'none', border: 'none', color: theme.alertRed, cursor: 'pointer', marginLeft: '10px', fontSize: '16px' }}>✖</button>}
                     
                     {/* DRAFT PASS TOGGLE */}
                     {gameState.auctionStatus === "Active" && isDraftMode && data.Roster.length >= 11 && (isOnlineMode ? name === myManagerName : true) && (
-                        <label style={{ marginLeft: '10px', display: 'inline-flex', alignItems: 'center', gap: '5px', cursor: 'pointer', background: data.isDraftPassed ? 'rgba(255,0,0,0.1)' : 'rgba(255,255,255,0.05)', padding: '6px 10px', borderRadius: '4px', border: `1px solid ${data.isDraftPassed ? theme.alertRed : '#444'}` }}>
+                        <label style={{ marginLeft: '10px', display: 'inline-flex', alignItems: 'center', gap: '5px', cursor: 'pointer', background: data.isDraftPassed ? theme.bgRedLight : theme.btnGlass, padding: '6px 10px', borderRadius: '4px', border: `1px solid ${data.isDraftPassed ? theme.alertRed : theme.border}` }}>
                             <input type="checkbox" checked={data.isDraftPassed || false} onChange={(e) => socket.emit('toggleDraftPass', { mgrName: name, isPassing: e.target.checked })} style={{ accentColor: theme.alertRed }} />
-                            <span style={{ color: data.isDraftPassed ? theme.alertRed : '#fff', fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>{data.isDraftPassed ? 'Sitting Out' : 'Pass Draft'}</span>
+                            <span style={{ color: data.isDraftPassed ? theme.alertRed : theme.textStrong, fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>{data.isDraftPassed ? 'Sitting Out' : 'Pass Draft'}</span>
                         </label>
                     )}
                 </td>
@@ -299,17 +318,17 @@ function App() {
         </table>
 
         {viewRosterMgr && (
-            <div style={{ padding: '20px', background: '#0b0e14', marginTop: '15px', borderRadius: '8px', border: `1px solid ${theme.border}` }}>
+            <div style={{ padding: '20px', background: theme.bgInput, marginTop: '15px', borderRadius: '8px', border: `1px solid ${theme.border}` }}>
                 <strong style={{ color: theme.accentGold }}>{viewRosterMgr}'s Current Roster: </strong><br/><br/>
                 {gameState.managers[viewRosterMgr].Roster.length === 0 ? <span style={{ color: theme.textMuted }}>Squad is empty.</span> : 
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                         {gameState.managers[viewRosterMgr].Roster.map((p, i) => (
-                            <span key={i} style={{ background: '#1e2330', padding: '6px 12px', borderRadius: '4px', fontSize: '13px', border: '1px solid #333', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <span key={i} style={{ background: theme.thBg, padding: '6px 12px', borderRadius: '4px', fontSize: '13px', border: `1px solid ${theme.border}`, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                                 <strong>{p.Name}</strong> 
                                 <span style={{ color: theme.accentNeon }}>[{p.Position}]</span> 
                                 <span style={{ color: theme.textMuted }}>({p.CardType})</span>
-                                <span style={{ color: '#00b8ff', fontWeight: 'bold', marginLeft: '4px' }}>ATK {p.Attack}</span>
-                                <span style={{ color: '#444' }}>|</span>
+                                <span style={{ color: theme.textAtk, fontWeight: 'bold', marginLeft: '4px' }}>ATK {p.Attack}</span>
+                                <span style={{ color: theme.textMuted }}>|</span>
                                 <span style={{ color: theme.alertRed, fontWeight: 'bold' }}>DEF {p.Defence}</span>
                             </span>
                         ))}
@@ -324,33 +343,33 @@ function App() {
         <section>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, color: theme.accentNeon, textTransform: 'uppercase' }}>2. Global Scouting Network</h3>
-              <div style={{ background: 'rgba(255, 0, 0, 0.1)', color: theme.alertRed, padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(255, 0, 0, 0.3)', fontWeight: 'bold', fontSize: '14px' }}>
+              <div style={{ background: theme.bgRedLight, color: theme.alertRed, padding: '6px 12px', borderRadius: '6px', border: `1px solid rgba(230, 57, 70, 0.3)`, fontWeight: 'bold', fontSize: '14px' }}>
                   🎯 {activeManagerName}'S TURN TO SCOUT
               </div>
           </div>
           
           {/* PRIVATE SCOUTING LOGIC FOR ONLINE MODE */}
           {!isMyTurn ? (
-            <div style={{ padding: '50px 20px', background: '#0b0e14', borderRadius: '8px', textAlign: 'center', border: `1px solid ${theme.border}`, boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5)' }}>
+            <div style={{ padding: '50px 20px', background: theme.bgInput, borderRadius: '8px', textAlign: 'center', border: `1px solid ${theme.border}`, boxShadow: isDarkMode ? 'inset 0 0 20px rgba(0,0,0,0.5)' : 'none' }}>
                 <div style={{ fontSize: '40px', marginBottom: '15px' }}>🕵️‍♂️</div>
-                <h3 style={{ color: '#fff', margin: '0 0 10px 0', textTransform: 'uppercase' }}>Scouting in Progress</h3>
+                <h3 style={{ color: theme.textStrong, margin: '0 0 10px 0', textTransform: 'uppercase' }}>Scouting in Progress</h3>
                 <p style={{ color: theme.textMuted, fontSize: '16px', margin: 0 }}>
                     Waiting for <strong style={{ color: theme.accentNeon }}>{activeManagerName}</strong> to finalize their transfer target.
                 </p>
-                <p style={{ color: '#555', fontSize: '13px', marginTop: '15px' }}>Their screen inputs are hidden from you to prevent sniping.</p>
+                <p style={{ color: theme.textMuted, fontSize: '13px', marginTop: '15px', opacity: 0.8 }}>Their screen inputs are hidden from you to prevent sniping.</p>
             </div>
           ) : (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                <input type="text" placeholder="Full Player Name" value={pName} onChange={(e) => setPName(e.target.value)} style={inputStyle} />
-                <select value={pPos} onChange={(e) => setPPos(e.target.value)} style={inputStyle}>
+                <input type="text" placeholder="Full Player Name" value={pName} onChange={(e) => setPName(e.target.value)} style={inputStyleDynamic} />
+                <select value={pPos} onChange={(e) => setPPos(e.target.value)} style={inputStyleDynamic}>
                   <option value="ST">ST / CF</option><option value="LW">LW</option><option value="RW">RW</option>
                   <option value="LM">LM</option><option value="RM">RM</option><option value="CAM">CAM</option>
                   <option value="CM">CM</option><option value="CDM">CDM</option><option value="LB">LB</option>
                   <option value="RB">RB</option><option value="CB">CB</option><option value="GK">GK</option>
                 </select>
-                <input type="number" placeholder="Age" value={pAge} onChange={(e) => setPAge(e.target.value)} style={inputStyle} />
-                <select value={pClub} onChange={(e) => setPClub(e.target.value)} style={inputStyle}>
+                <input type="number" placeholder="Age" value={pAge} onChange={(e) => setPAge(e.target.value)} style={inputStyleDynamic} />
+                <select value={pClub} onChange={(e) => setPClub(e.target.value)} style={inputStyleDynamic}>
                   <option value="Other League Club (Base Card Only)">Other League Club (Base Card Only)</option>
                   {Object.entries(UEFA_CLUBS).map(([league, clubs]) => (
                       <optgroup key={league} label={league}>
@@ -359,10 +378,10 @@ function App() {
                   ))}
                 </select>
                 {/* Hide Transfer Value in Draft Mode to keep UI clean */}
-                {!isDraftMode && <input type="text" placeholder="Transfermarkt Price (€)" value={pValue} onChange={(e) => setPValue(formatCurrency(e.target.value))} style={inputStyle} />}
+                {!isDraftMode && <input type="text" placeholder="Transfermarkt Price (€)" value={pValue} onChange={(e) => setPValue(formatCurrency(e.target.value))} style={inputStyleDynamic} />}
               </div>
               
-              <div style={{ marginTop: '25px', padding: '20px', background: '#0b0e14', borderRadius: '8px', border: `1px solid ${theme.border}` }}>
+              <div style={{ marginTop: '25px', padding: '20px', background: theme.bgInput, borderRadius: '8px', border: `1px solid ${theme.border}` }}>
                   <h4 style={{ margin: '0 0 15px 0', color: theme.textMuted, textTransform: 'uppercase', fontSize: '13px' }}>EA FC 26 Base Attributes</h4>
                   <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
                     {currentStatLabels.map(({ key, label }) => (
@@ -370,7 +389,7 @@ function App() {
                         <label style={{ fontSize: '12px', fontWeight: 'bold', color: theme.accentNeon, marginBottom: '8px' }}>{label}</label>
                         <input 
                             type="number" 
-                            style={{ ...inputStyle, textAlign: 'center', fontSize: '16px', fontWeight: 'bold', padding: '10px 5px' }} 
+                            style={{ ...inputStyleDynamic, textAlign: 'center', fontSize: '16px', fontWeight: 'bold', padding: '10px 5px' }} 
                             value={stats[key]} 
                             onChange={(e) => setStats({ ...stats, [key]: e.target.value })} 
                         />
@@ -379,7 +398,7 @@ function App() {
                   </div>
               </div>
 
-              <button onClick={handlePlayerSubmit} disabled={!!gameState.cardOnBlock} style={{ ...btnStyle, background: `linear-gradient(90deg, ${theme.accentNeon}, #00b8ff)`, color: '#000', width: '100%', marginTop: '20px', padding: '15px', fontSize: '16px', textTransform: 'uppercase', letterSpacing: '1px', boxShadow: `0 4px 15px rgba(0, 255, 135, 0.3)` }}>
+              <button onClick={handlePlayerSubmit} disabled={!!gameState.cardOnBlock} style={{ ...btnStyle, background: `linear-gradient(90deg, ${theme.accentNeon}, #00b8ff)`, color: '#000', width: '100%', marginTop: '20px', padding: '15px', fontSize: '16px', textTransform: 'uppercase', letterSpacing: '1px', boxShadow: isDarkMode ? `0 4px 15px rgba(0, 255, 135, 0.3)` : 'none' }}>
                 {isDraftMode ? 'GENERATE CARD & DRAFT PLAYER' : 'GENERATE CARD & LAUNCH AUCTION'}
               </button>
             </>
@@ -389,20 +408,20 @@ function App() {
 
       {/* AUCTION BLOCK - GOLD THEME (ONLY RENDERS IN AUCTION MODE) */}
       {gameState.cardOnBlock && !isDraftMode && (
-        <section style={{ border: `2px solid ${theme.accentGold}`, boxShadow: `0 0 20px rgba(255, 215, 0, 0.15)`, background: 'linear-gradient(145deg, #151922, #1a1a1a)' }}>
+        <section style={{ border: `2px solid ${theme.accentGold}`, boxShadow: isDarkMode ? `0 0 20px rgba(255, 215, 0, 0.15)` : 'none', background: theme.bgCard }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
                 <div style={{ color: theme.accentGold, fontSize: '14px', fontWeight: 'bold', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '5px' }}>Live Transfer Target</div>
-                <h2 style={{ margin: 0, fontSize: '2.2rem', color: '#fff', textTransform: 'uppercase' }}>{gameState.cardOnBlock.Name} <span style={{ color: theme.textMuted, fontSize: '1.5rem' }}>[{gameState.cardOnBlock.Position}]</span></h2>
+                <h2 style={{ margin: 0, fontSize: '2.2rem', color: theme.textStrong, textTransform: 'uppercase' }}>{gameState.cardOnBlock.Name} <span style={{ color: theme.textMuted, fontSize: '1.5rem' }}>[{gameState.cardOnBlock.Position}]</span></h2>
             </div>
             <div style={{ textAlign: 'right' }}>
-                <h1 style={{ margin: 0, fontSize: '3rem', color: timeLeft <= 10 ? theme.alertRed : theme.accentNeon, textShadow: `0 0 10px ${timeLeft <= 10 ? 'rgba(255,0,0,0.5)' : 'rgba(0,255,135,0.3)'}` }}>
+                <h1 style={{ margin: 0, fontSize: '3rem', color: timeLeft <= 10 ? theme.alertRed : theme.accentNeon, textShadow: isDarkMode ? `0 0 10px ${timeLeft <= 10 ? 'rgba(255,0,0,0.5)' : 'rgba(0,255,135,0.3)'}` : 'none' }}>
                     {timeLeft}s
                 </h1>
             </div>
           </div>
           
-          <div style={{ display: 'flex', gap: '30px', marginTop: '20px', padding: '20px', background: '#0b0e14', borderRadius: '8px', border: `1px solid ${theme.border}` }}>
+          <div style={{ display: 'flex', gap: '30px', marginTop: '20px', padding: '20px', background: theme.bgInput, borderRadius: '8px', border: `1px solid ${theme.border}` }}>
               <div>
                   <div style={{ color: theme.textMuted, fontSize: '12px', textTransform: 'uppercase' }}>Club</div>
                   <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{gameState.cardOnBlock.Club}</div>
@@ -420,9 +439,9 @@ function App() {
                               <span style={{ color: theme.accentGold }}>ATK {gameState.cardOnBlock.Attack}</span>
                           </>
                       ) : (
-                          <span style={{ color: '#00b8ff' }}>ATK {gameState.cardOnBlock.Attack}</span>
+                          <span style={{ color: theme.textAtk }}>ATK {gameState.cardOnBlock.Attack}</span>
                       )}
-                      <span style={{ color: '#444', margin: '0 8px' }}>|</span>
+                      <span style={{ color: theme.textMuted, margin: '0 8px' }}>|</span>
                       {gameState.cardOnBlock.CardType !== "Base Card" && gameState.cardOnBlock.Defence !== gameState.cardOnBlock.BaseDefence ? (
                           <>
                               <span style={{ color: theme.textMuted, fontSize: '14px', textDecoration: 'line-through' }}>{gameState.cardOnBlock.BaseDefence}</span>{' '}
@@ -435,9 +454,9 @@ function App() {
               </div>
           </div>
           
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px', padding: '15px 20px', background: 'rgba(255, 215, 0, 0.05)', borderRadius: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px', padding: '15px 20px', background: theme.bgGoldLight, borderRadius: '8px' }}>
             <div style={{ fontSize: '16px' }}>
-                <span style={{ color: theme.textMuted }}>Base Valuation:</span> <strong style={{ color: '#fff' }}>€{gameState.cardOnBlock.Value.toLocaleString()}</strong>
+                <span style={{ color: theme.textMuted }}>Base Valuation:</span> <strong style={{ color: theme.textStrong }}>€{gameState.cardOnBlock.Value.toLocaleString()}</strong>
             </div>
             <div style={{ fontSize: '20px' }}>
                 <span style={{ color: theme.textMuted }}>Current Bid:</span> <strong style={{ color: theme.accentGold }}>€{gameState.cardOnBlock.highestBid.toLocaleString()}</strong> 
@@ -457,12 +476,12 @@ function App() {
                   const isMyConsole = isOnlineMode ? name === myManagerName : true;
 
                   return (
-                    <div key={name} style={{ flex: 1, minWidth: '250px', border: `1px solid ${hasPassed ? '#333' : (isMyConsole ? theme.accentNeon : theme.border)}`, padding: '20px', borderRadius: '8px', background: isMyConsole ? '#11151c' : '#0b0e14', opacity: hasPassed ? 0.6 : 1, transition: '0.3s', position: 'relative' }}>
+                    <div key={name} style={{ flex: 1, minWidth: '250px', border: `1px solid ${hasPassed ? (isDarkMode ? '#333' : '#ccc') : (isMyConsole ? theme.accentNeon : theme.border)}`, padding: '20px', borderRadius: '8px', background: isMyConsole ? theme.bgCard : theme.bgMain, opacity: hasPassed ? 0.6 : 1, transition: '0.3s', position: 'relative' }}>
                         {isMyConsole && isOnlineMode && (
                             <div style={{ position: 'absolute', top: '-10px', left: '20px', background: theme.accentNeon, color: '#000', fontSize: '11px', fontWeight: 'bold', padding: '2px 8px', borderRadius: '4px', textTransform: 'uppercase' }}>YOUR CONSOLE</div>
                         )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', marginTop: isMyConsole && isOnlineMode ? '5px' : '0' }}>
-                            <strong style={{ fontSize: '18px', color: '#fff', textDecoration: hasPassed ? 'line-through' : 'none' }}>{name}</strong>
+                            <strong style={{ fontSize: '18px', color: theme.textStrong, textDecoration: hasPassed ? 'line-through' : 'none' }}>{name}</strong>
                             <span style={{ color: theme.accentGold, fontFamily: 'monospace' }}>€{gameState.managers[name].Budget.toLocaleString()}</span>
                         </div>
                         {isMyConsole ? (
@@ -474,12 +493,12 @@ function App() {
                                     </label>
                                 </div>
                                 <div style={{ display: 'flex', gap: '10px' }}>
-                                    <input type="text" placeholder={hasPassed ? "PASSED" : "Enter bid..."} disabled={hasPassed} value={managerBids[name] || ''} onChange={(e) => setManagerBids({...managerBids, [name]: formatCurrency(e.target.value)})} style={{ ...inputStyle, background: '#1a1a1a', cursor: hasPassed ? 'not-allowed' : 'text' }} />
-                                    <button onClick={() => submitBid(name)} disabled={hasPassed} style={{ ...btnStyle, background: hasPassed ? '#444' : theme.accentNeon, width: '80px', color: hasPassed ? '#888' : '#000', cursor: hasPassed ? 'not-allowed' : 'pointer' }}>BID</button>
+                                    <input type="text" placeholder={hasPassed ? "PASSED" : "Enter bid..."} disabled={hasPassed} value={managerBids[name] || ''} onChange={(e) => setManagerBids({...managerBids, [name]: formatCurrency(e.target.value)})} style={{ ...inputStyleDynamic, background: theme.bgInput, cursor: hasPassed ? 'not-allowed' : 'text' }} />
+                                    <button onClick={() => submitBid(name)} disabled={hasPassed} style={{ ...btnStyle, background: hasPassed ? (isDarkMode ? '#444' : '#ccc') : theme.accentNeon, width: '80px', color: hasPassed ? (isDarkMode ? '#888' : '#666') : '#000', cursor: hasPassed ? 'not-allowed' : 'pointer' }}>BID</button>
                                 </div>
                             </>
                         ) : (
-                            <div style={{ height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: `1px dashed ${theme.border}` }}>
+                            <div style={{ height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: theme.btnGlass, borderRadius: '6px', border: `1px dashed ${theme.border}` }}>
                                 {hasPassed ? <span style={{ color: theme.alertRed, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>🚫 Passed</span> : isHighestBidder ? <span style={{ color: theme.accentGold, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>👑 Leading Bid</span> : <span style={{ color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '1px', fontSize: '13px' }}>⏳ Evaluating...</span>}
                             </div>
                         )}
@@ -492,7 +511,7 @@ function App() {
 
       {/* COMPLETED SCREEN / SQUAD BUILDER */}
       {gameState.auctionStatus === "Completed" && (
-          <section style={{ border: `2px solid ${theme.accentNeon}`, boxShadow: `0 0 15px rgba(0, 255, 135, 0.1)` }}>
+          <section style={{ border: `2px solid ${theme.accentNeon}`, boxShadow: isDarkMode ? `0 0 15px rgba(0, 255, 135, 0.1)` : 'none' }}>
               <div style={{ textAlign: 'center', marginBottom: '30px' }}>
                 <h2 style={{ color: theme.accentNeon, margin: '0 0 10px 0', textTransform: 'uppercase', fontSize: '2.5rem' }}>{isDraftMode ? 'Draft Concluded' : 'Transfer Window Closed'}</h2>
                 <p style={{ color: theme.textMuted, fontSize: '16px' }}>Select exactly 11 players for your Starting XI. The rest will move to the bench.</p>
@@ -500,7 +519,7 @@ function App() {
 
               {/* TOURNAMENT BRACKET RENDER */}
               {gameState.bracket && (
-                <div style={{ marginBottom: '30px', padding: '25px', background: '#0b0e14', borderRadius: '12px', border: `1px solid ${theme.accentGold}` }}>
+                <div style={{ marginBottom: '30px', padding: '25px', background: theme.bgInput, borderRadius: '12px', border: `1px solid ${theme.accentGold}` }}>
                     <h3 style={{ margin: '0 0 20px 0', color: theme.accentGold, textTransform: 'uppercase', textAlign: 'center', fontSize: '1.8rem' }}>🏆 Official Tournament Bracket</h3>
                     
                     {gameState.bracket.byes.length > 0 && (
@@ -508,20 +527,20 @@ function App() {
                             <h4 style={{ color: theme.accentNeon, textTransform: 'uppercase', marginBottom: '10px' }}>🎟️ First-Round Byes (Auto-Advance)</h4>
                             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                                 {gameState.bracket.byes.map(p => (
-                                    <span key={p} style={{ padding: '8px 15px', background: 'rgba(0, 255, 135, 0.1)', border: `1px solid ${theme.accentNeon}`, borderRadius: '6px', color: '#fff', fontWeight: 'bold' }}>{p}</span>
+                                    <span key={p} style={{ padding: '8px 15px', background: theme.bgNeonLight, border: `1px solid ${theme.accentNeon}`, borderRadius: '6px', color: theme.textStrong, fontWeight: 'bold' }}>{p}</span>
                                 ))}
                             </div>
                         </div>
                     )}
 
                     <div>
-                        <h4 style={{ color: '#00b8ff', textTransform: 'uppercase', marginBottom: '10px' }}>⚔️ Round 1 Matchups</h4>
+                        <h4 style={{ color: theme.textAtk, textTransform: 'uppercase', marginBottom: '10px' }}>⚔️ Round 1 Matchups</h4>
                         <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
                             {gameState.bracket.round1.map((match, idx) => (
-                                <div key={idx} style={{ flex: 1, minWidth: '250px', padding: '15px', background: '#151922', border: `1px solid ${theme.border}`, borderRadius: '8px', textAlign: 'center' }}>
-                                    <span style={{ color: '#fff', fontSize: '18px', fontWeight: 'bold' }}>{match[0]}</span>
+                                <div key={idx} style={{ flex: 1, minWidth: '250px', padding: '15px', background: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: '8px', textAlign: 'center' }}>
+                                    <span style={{ color: theme.textStrong, fontSize: '18px', fontWeight: 'bold' }}>{match[0]}</span>
                                     <span style={{ color: theme.alertRed, margin: '0 15px', fontWeight: 'bold' }}>VS</span>
-                                    <span style={{ color: '#fff', fontSize: '18px', fontWeight: 'bold' }}>{match[1]}</span>
+                                    <span style={{ color: theme.textStrong, fontSize: '18px', fontWeight: 'bold' }}>{match[1]}</span>
                                 </div>
                             ))}
                         </div>
@@ -535,17 +554,17 @@ function App() {
                   const startersCount = data.Roster.filter(p => p.isStarting).length;
                   const isFull = startersCount === 11;
                   return (
-                    <div key={name} style={{ marginBottom: '30px', padding: '25px', background: '#0b0e14', borderRadius: '12px', border: `1px solid ${theme.border}` }}>
+                    <div key={name} style={{ marginBottom: '30px', padding: '25px', background: theme.bgInput, borderRadius: '12px', border: `1px solid ${theme.border}` }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: `1px solid ${theme.border}`, paddingBottom: '15px' }}>
-                            <h3 style={{ margin: 0, fontSize: '1.5rem', color: '#fff' }}>{name} <span style={{ color: theme.textMuted, fontSize: '1rem', fontWeight: 'normal' }}>({data.Formation})</span></h3>
-                            <div style={{ background: isFull ? 'rgba(0,255,135,0.1)' : 'rgba(255,255,255,0.05)', color: isFull ? theme.accentNeon : '#fff', padding: '8px 15px', borderRadius: '20px', border: `1px solid ${isFull ? theme.accentNeon : theme.border}`, fontWeight: 'bold' }}>
+                            <h3 style={{ margin: 0, fontSize: '1.5rem', color: theme.textStrong }}>{name} <span style={{ color: theme.textMuted, fontSize: '1rem', fontWeight: 'normal' }}>({data.Formation})</span></h3>
+                            <div style={{ background: isFull ? theme.bgNeonLight : theme.btnGlass, color: isFull ? theme.accentNeon : theme.textStrong, padding: '8px 15px', borderRadius: '20px', border: `1px solid ${isFull ? theme.accentNeon : theme.border}`, fontWeight: 'bold' }}>
                                 Starting XI: {startersCount}/11
                             </div>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '15px' }}>
                             {data.Roster.map((player, idx) => (
                                 <label key={idx} style={{ 
-                                    background: player.isStarting ? 'rgba(0, 255, 135, 0.08)' : '#151922', 
+                                    background: player.isStarting ? theme.bgNeonLight : theme.bgCard, 
                                     padding: '12px', borderRadius: '8px', border: `1px solid ${player.isStarting ? theme.accentNeon : theme.border}`, 
                                     cursor: (!player.isStarting && isFull) ? 'not-allowed' : 'pointer',
                                     display: 'flex', alignItems: 'center', gap: '10px', transition: '0.2s',
@@ -556,7 +575,7 @@ function App() {
                                            onChange={(e) => socket.emit('toggleStarter', { mgrName: name, playerIndex: idx, isStarting: e.target.checked })} 
                                            style={{ accentColor: theme.accentNeon, width: '18px', height: '18px' }}/>
                                     <div style={{ lineHeight: '1.4' }}>
-                                        <div style={{ fontWeight: 'bold', color: player.isStarting ? theme.accentNeon : '#fff' }}>{player.Name}</div>
+                                        <div style={{ fontWeight: 'bold', color: player.isStarting ? theme.accentNeon : theme.textStrong }}>{player.Name}</div>
                                         <div style={{ fontSize: '12px', color: theme.textMuted }}>[{player.Position}] <span style={{ color: theme.accentGold }}>{player.Rating}</span></div>
                                     </div>
                                 </label>
@@ -567,7 +586,7 @@ function App() {
               })}
 
               <div style={{ textAlign: 'center', marginTop: '40px' }}>
-                <button onClick={downloadExcel} style={{ ...btnStyle, background: '#27ae60', color: '#fff', padding: '15px 30px', fontSize: '16px', borderRadius: '30px', boxShadow: '0 4px 15px rgba(39, 174, 96, 0.4)' }}>
+                <button onClick={downloadExcel} style={{ ...btnStyle, background: '#27ae60', color: '#fff', padding: '15px 30px', fontSize: '16px', borderRadius: '30px', boxShadow: isDarkMode ? '0 4px 15px rgba(39, 174, 96, 0.4)' : 'none' }}>
                     📊 Download Official Match Data (CSV)
                 </button>
               </div>
