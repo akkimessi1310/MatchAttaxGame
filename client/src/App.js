@@ -60,7 +60,8 @@ function App() {
   const [pName, setPName] = useState('');
   const [pPos, setPPos] = useState('ST');
   const [pAge, setPAge] = useState(25);
-  const [pClub, setPClub] = useState('Other League Club (Base Card Only)');
+  const [pClub, setPClub] = useState('Other League Club');
+  const [customClub, setCustomClub] = useState(''); // New state for custom club entry
   const [pValue, setPValue] = useState("1,000,000");
   const [stats, setStats] = useState({ s1: 80, s2: 80, s3: 80, s4: 80, s5: 80, s6: 80 });
   const [viewRosterMgr, setViewRosterMgr] = useState(null);
@@ -117,8 +118,12 @@ function App() {
   };
 
   const handlePlayerSubmit = () => {
-    socket.emit('submitPlayerEntry', { roomId, name: pName, position: pPos, age: pAge, club: pClub, value: pValue, stats });
+    // Determine which club string to send to the server
+    const finalClub = pClub === 'Other League Club' && customClub.trim() !== '' ? customClub : pClub;
+    
+    socket.emit('submitPlayerEntry', { roomId, name: pName, position: pPos, age: pAge, club: finalClub, value: pValue, stats });
     setPName(''); 
+    setCustomClub(''); // Clear the custom club input after submitting
   };
 
   const submitBid = (mgrName) => {
@@ -446,14 +451,21 @@ function App() {
                     <option value="RB">RB</option><option value="CB">CB</option><option value="GK">GK</option>
                   </select>
                   <input type="number" placeholder="Age" value={pAge} onChange={(e) => setPAge(e.target.value)} style={inputStyleDynamic} />
+                  
                   <select value={pClub} onChange={(e) => setPClub(e.target.value)} style={inputStyleDynamic}>
-                    <option value="Other League Club (Base Card Only)">Other League Club (Base Card Only)</option>
+                    <option value="Other League Club">Other League Club</option>
                     {Object.entries(UEFA_CLUBS).map(([league, clubs]) => (
                         <optgroup key={league} label={league}>
                             {clubs.map(club => <option key={club} value={club}>{club}</option>)}
                         </optgroup>
                     ))}
                   </select>
+
+                  {/* Conditional input for custom club name */}
+                  {pClub === 'Other League Club' && (
+                      <input type="text" placeholder="Enter Custom Club Name (e.g., Al Nassr)" value={customClub} onChange={(e) => setCustomClub(e.target.value)} style={inputStyleDynamic} />
+                  )}
+
                   {!isDraftMode && <input type="text" placeholder="Transfermarkt Price (€)" value={pValue} onChange={(e) => setPValue(formatCurrency(e.target.value))} style={inputStyleDynamic} />}
                 </div>
                 
