@@ -164,8 +164,8 @@ function App() {
       {/* HEADER SECTION */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: `1px solid ${theme.border}`, paddingBottom: '20px' }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '2.5rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '-1px', background: `linear-gradient(90deg, ${theme.accentNeon}, #00b8ff)`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                FC 27 x Match Attax
+            <h1 style={{ margin: 0, fontSize: '2.5rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '-1px', color: theme.accentNeon }}>
+                FC 27 X Match Attax
             </h1>
             {myManagerName && <div style={{ marginTop: '8px', color: theme.textMuted, fontSize: '14px' }}>
                 <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: theme.accentNeon, marginRight: '8px', boxShadow: `0 0 8px ${theme.accentNeon}` }}></span>
