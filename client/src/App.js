@@ -463,7 +463,7 @@ function App() {
 
                   {/* Conditional input for custom club name */}
                   {pClub === 'Other League Club' && (
-                      <input type="text" placeholder="Enter Custom Club Name (e.g., Al Nassr)" value={customClub} onChange={(e) => setCustomClub(e.target.value)} style={inputStyleDynamic} />
+                      <input type="text" placeholder="Enter Custom Club Name (e.g., Inter Miami)" value={customClub} onChange={(e) => setCustomClub(e.target.value)} style={inputStyleDynamic} />
                   )}
 
                   {!isDraftMode && <input type="text" placeholder="Transfermarkt Price (€)" value={pValue} onChange={(e) => setPValue(formatCurrency(e.target.value))} style={inputStyleDynamic} />}
