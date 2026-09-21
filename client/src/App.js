@@ -186,8 +186,32 @@ function App() {
               <button onClick={toggleTheme} style={{ ...btnStyle, background: theme.bgInput, color: theme.textStrong, border: `1px solid ${theme.border}`, fontSize: '16px', padding: '8px 12px' }} title="Toggle Dark/Light Mode">
                   {isDarkMode ? '☀️' : '🌙'}
               </button>
-              {isHost && <button onClick={() => { if(window.confirm('Wipe history, rosters, and budgets?')) socket.emit('resetAuction', { roomId }); }} style={{ ...btnStyle, background: '#2c3e50', color: '#fff' }}>🔄 Restart Season</button>}
-              <button onClick={() => { localStorage.clear(); setRoomId(null); setMyManagerName(''); socket.emit('disconnect'); window.location.reload(); }} style={{ ...btnStyle, background: '#c0392b', color: '#fff' }}>🚪 Leave Game</button>
+              
+              {/* Reset Game Button - Now visible to anyone in the room */}
+              {roomId && (
+                  <button onClick={() => { 
+                      if(window.confirm('Wipe history, rosters, and budgets for this room?')) {
+                          socket.emit('resetAuction', { roomId }); 
+                      }
+                  }} style={{ ...btnStyle, background: '#2c3e50', color: '#fff' }}>
+                      🔄 Reset Game
+                  </button>
+              )}
+
+              {/* Hard Reset / Leave Room Button */}
+              {roomId && (
+                  <button onClick={() => { 
+                      if(window.confirm('Completely wipe your local data and leave this room?')) { 
+                          localStorage.clear(); 
+                          setRoomId(null); 
+                          setMyManagerName(''); 
+                          socket.emit('disconnect'); 
+                          window.location.reload(); 
+                      } 
+                  }} style={{ ...btnStyle, background: '#c0392b', color: '#fff' }}>
+                      🗑️ Hard Reset
+                  </button>
+              )}
           </div>
       </div>
 
