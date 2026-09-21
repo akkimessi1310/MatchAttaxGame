@@ -50,7 +50,6 @@ function App() {
   const [myManagerName, setMyManagerName] = useState(localStorage.getItem('myManagerName') || '');
   const [timeLeft, setTimeLeft] = useState(0);
   
-  // NEW: Dark/Light Mode State with Local Storage persistence
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('themeMode') !== 'light');
   const theme = isDarkMode ? darkTheme : lightTheme;
 
@@ -163,7 +162,7 @@ function App() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: `1px solid ${theme.border}`, paddingBottom: '20px' }}>
           <div>
             <h1 style={{ margin: 0, fontSize: '2.5rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '-1px', background: `linear-gradient(90deg, ${theme.accentNeon}, #00b8ff)`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                FC 26 x Match Attax
+                FC 27 x Match Attax
             </h1>
             {myManagerName && <div style={{ marginTop: '8px', color: theme.textMuted, fontSize: '14px' }}>
                 <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: theme.accentNeon, marginRight: '8px', boxShadow: `0 0 8px ${theme.accentNeon}` }}></span>
@@ -382,7 +381,7 @@ function App() {
               </div>
               
               <div style={{ marginTop: '25px', padding: '20px', background: theme.bgInput, borderRadius: '8px', border: `1px solid ${theme.border}` }}>
-                  <h4 style={{ margin: '0 0 15px 0', color: theme.textMuted, textTransform: 'uppercase', fontSize: '13px' }}>EA FC 26 Base Attributes</h4>
+                  <h4 style={{ margin: '0 0 15px 0', color: theme.textMuted, textTransform: 'uppercase', fontSize: '13px' }}>EA FC 27 Base Attributes</h4>
                   <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
                     {currentStatLabels.map(({ key, label }) => (
                       <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: '60px' }}>

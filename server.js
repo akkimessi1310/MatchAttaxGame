@@ -154,7 +154,6 @@ function advanceDraftTurn() {
             return;
         }
 
-        // Snake Draft logic: Forward on odd rounds, Backward on even rounds
         let index = gameState.draftRound % 2 !== 0 
             ? gameState.draftPick 
             : (gameState.turnOrder.length - 1 - gameState.draftPick); 
@@ -162,7 +161,6 @@ function advanceDraftTurn() {
         let mgrName = gameState.turnOrder[index];
         let mgr = gameState.managers[mgrName];
         
-        // Skip managers who are full or have toggled the Pass button
         if (mgr && mgr.Roster.length < 18 && !mgr.isDraftPassed) {
             gameState.activeDraftManager = mgrName;
             found = true;
@@ -299,7 +297,6 @@ io.on('connection', (socket) => {
         const mgrCount = Object.keys(gameState.managers).length;
         if (mgrCount < 2) return socket.emit('auctionError', "You need at least 2 players to start a game!");
 
-        // STRICT MODE VALIDATION
         if ((mode.includes("Casual") || mode.includes("Match")) && mgrCount !== 2) {
             return socket.emit('auctionError', "Head-to-head matches require exactly 2 players!");
         }
@@ -328,13 +325,12 @@ io.on('connection', (socket) => {
             gameState.bracket = null;
         }
 
-        // Boot correct engine
         if (system === "Draft") {
             gameState.draftRound = 1;
             gameState.draftPick = -1;
             gameState.activeDraftManager = null;
             advanceDraftTurn(); 
-            io.emit('updateState', gameState); // FAILSAFE: Guarantees the screen updates!
+            io.emit('updateState', gameState); 
         } else {
             gameState.currentTurnIndex = 0;
             io.emit('updateState', gameState);
@@ -376,7 +372,6 @@ io.on('connection', (socket) => {
         const rawVal = String(playerData.value).replace(/,/g, '');
         const { atk: f_atk, dfc: f_def } = applyBoosts(cardType, pos, age, b_atk, b_def);
 
-        // ROUTE LOGIC BASED ON GAME SYSTEM
         if (gameState.draftSystem === "Draft") {
             let mgrName = gameState.activeDraftManager;
             let mgr = gameState.managers[mgrName];
