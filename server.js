@@ -1,12 +1,20 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const { Redis } = require('@upstash/redis');
 
 const app = express();
 app.use(cors());
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
+
+// Upstash Redis Client
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
 
 const UEFA_CLUBS = [
     "AEK Athens", "Arsenal", "Aston Villa", "Atlético Madrid", "Barcelona", "Bayern Munich", "Bodø/Glimt", "Borussia Dortmund", "Club Brugge", "Como", "Fenerbahçe", "Feyenoord", "Galatasaray", "Inter Milan (Lombardia FC)", "LASK", "Lens", "Lille", "Liverpool", "Manchester City", "Manchester United", "Napoli", "Paris Saint-Germain", "Porto", "PSV Eindhoven", "RB Leipzig", "Real Betis", "Real Madrid", "Roma", "Shakhtar Donetsk", "Slavia Prague", "Sporting CP", "VfB Stuttgart", "Viking", "Villarreal",
@@ -18,15 +26,35 @@ const RARITY_TIERS = ["Base Card", "Man of the Match", "Wildcard", "All-Action H
 const RARITY_WEIGHTS = [32.0, 15.0, 10.0, 10.0, 8.0, 8.0, 6.0, 5.0, 4.0, 2.0];
 
 // ==========================================
-// STATE MANAGEMENT (ROOM BASED)
+// STATE MANAGEMENT & REDIS HELPERS
 // ==========================================
 const activeGames = {}; // Maps roomId -> { state: gameStateObject, timer: intervalObject }
 const socketToRoom = {}; // Maps socket.id -> roomId
 const socketToManager = {}; // Maps socket.id -> managerName
 
+async function saveGameToRedis(roomId) {
+    if (activeGames[roomId]) {
+        try {
+            // Save state with 24-hour expiration
+            await redis.set(`matchattax:${roomId}`, activeGames[roomId].state, { ex: 86400 });
+        } catch (err) {
+            console.error(`Error saving room ${roomId} to Redis:`, err);
+        }
+    }
+}
+
+async function loadGameFromRedis(roomId) {
+    try {
+        return await redis.get(`matchattax:${roomId}`);
+    } catch (err) {
+        console.error(`Error loading room ${roomId} from Redis:`, err);
+        return null;
+    }
+}
+
 function createEmptyGameState() {
     return { 
-        host: null, // Admin role
+        host: null,
         managers: {}, 
         auctionHistory: [], 
         soldPlayers: [], 
@@ -45,7 +73,6 @@ function createEmptyGameState() {
     };
 }
 
-// Math Helpers (Unchanged)
 function calculateBaseStats(pos, atts) {
     let atk = 0, dfc = 0;
     const PAS = parseInt(atts.s1)||0, PAC = parseInt(atts.s2)||0, DRI = parseInt(atts.s3)||0, SHO = parseInt(atts.s4)||0;
@@ -86,7 +113,7 @@ function applyBoosts(card, pos, age, b_atk, b_def) {
 }
 
 // ==========================================
-// GAME ENGINE LOGIC (ROOM BASED)
+// GAME ENGINE LOGIC
 // ==========================================
 function checkDraftEnd(roomId) {
     let game = activeGames[roomId];
@@ -104,6 +131,7 @@ function checkDraftEnd(roomId) {
         clearInterval(game.timer);
         game.state.auctionStatus = "Completed";
         io.to(roomId).emit('updateState', game.state);
+        saveGameToRedis(roomId);
         return true;
     }
     return false;
@@ -135,6 +163,7 @@ function pauseDraftTimer(roomId) {
         clearInterval(game.timer);
         game.state.isTimerPaused = true;
         io.to(roomId).emit('updateState', game.state); 
+        saveGameToRedis(roomId);
     }
 }
 
@@ -158,6 +187,7 @@ function autoDraftPunishment(roomId, mgrName) {
     });
     
     io.to(roomId).emit('updateState', game.state);
+    saveGameToRedis(roomId);
     advanceDraftTurn(roomId);
 }
 
@@ -182,6 +212,7 @@ function advanceDraftTurn(roomId) {
             game.state.auctionStatus = "Completed";
             clearInterval(game.timer);
             io.to(roomId).emit('updateState', game.state);
+            saveGameToRedis(roomId);
             return;
         }
 
@@ -196,8 +227,8 @@ function advanceDraftTurn(roomId) {
             game.state.activeDraftManager = mgrName;
             found = true;
             io.to(roomId).emit('updateState', game.state);
+            saveGameToRedis(roomId);
             
-            // If the person whose turn it is happens to be offline, pause immediately
             if (mgr.isOnline === false) {
                 pauseDraftTimer(roomId);
             } else {
@@ -211,6 +242,7 @@ function advanceDraftTurn(roomId) {
         game.state.auctionStatus = "Completed";
         clearInterval(game.timer);
         io.to(roomId).emit('updateState', game.state);
+        saveGameToRedis(roomId);
     }
 }
 
@@ -258,6 +290,7 @@ function resolveAuction(roomId) {
         game.state.auctionStatus = "Completed";
     }
     io.to(roomId).emit('updateState', game.state);
+    saveGameToRedis(roomId);
 }
 
 function checkAuctionEndEarly(roomId) {
@@ -286,31 +319,48 @@ function checkAuctionEndEarly(roomId) {
 io.on('connection', (socket) => {
     
     // --- ROOM CREATION & JOINING ---
-    socket.on('createRoom', () => {
+    socket.on('createRoom', async () => {
         const roomId = Math.random().toString(36).substring(2, 6).toUpperCase(); 
         activeGames[roomId] = { state: createEmptyGameState(), timer: null };
         socket.join(roomId);
         socketToRoom[socket.id] = roomId;
+        
+        await saveGameToRedis(roomId);
+
         socket.emit('roomCreated', roomId);
         io.to(roomId).emit('updateState', activeGames[roomId].state);
     });
 
-    socket.on('joinRoom', (roomId) => {
+    socket.on('joinRoom', async (roomId) => {
         if(!roomId) return;
         roomId = roomId.toUpperCase();
-        if (activeGames[roomId]) {
-            socket.join(roomId);
-            socketToRoom[socket.id] = roomId;
-            socket.emit('roomJoined', roomId);
-            io.to(roomId).emit('updateState', activeGames[roomId].state);
-        } else {
-            socket.emit('auctionError', "Room not found or has expired!");
+
+        // If server was sleeping or reset memory, fetch room from Redis
+        if (!activeGames[roomId]) {
+            const savedState = await loadGameFromRedis(roomId);
+            if (savedState) {
+                activeGames[roomId] = { state: savedState, timer: null };
+            } else {
+                return socket.emit('auctionError', "Room not found or has expired!");
+            }
         }
+        
+        socket.join(roomId);
+        socketToRoom[socket.id] = roomId;
+        socket.emit('roomJoined', roomId);
+        io.to(roomId).emit('updateState', activeGames[roomId].state);
     });
 
-    socket.on('reconnectUser', ({ roomId, mgrName }) => {
+    socket.on('reconnectUser', async ({ roomId, mgrName }) => {
         if (!roomId) return;
         roomId = roomId.toUpperCase();
+
+        // Restore room from Redis if missing
+        if (!activeGames[roomId]) {
+            const savedState = await loadGameFromRedis(roomId);
+            if (savedState) activeGames[roomId] = { state: savedState, timer: null };
+        }
+
         let game = activeGames[roomId];
         
         if (game) {
@@ -319,12 +369,10 @@ io.on('connection', (socket) => {
             
             if (mgrName && game.state.managers[mgrName]) {
                 socketToManager[socket.id] = mgrName;
-                game.state.managers[mgrName].isOnline = true; // Mark back online
+                game.state.managers[mgrName].isOnline = true; 
                 
-                // If they are host, ensure host title persists (in case it dropped)
                 if(!game.state.host) game.state.host = mgrName;
 
-                // Resume draft timer if they were on the clock and it was paused
                 if (game.state.activeDraftManager === mgrName && game.state.isTimerPaused) {
                     startDraftTimer(roomId, game.state.draftTimeLeft);
                 }
@@ -332,7 +380,7 @@ io.on('connection', (socket) => {
             socket.emit('roomJoined', roomId);
             socket.emit('updateState', game.state);
         } else {
-            socket.emit('forceClearStorage'); // Tell client room is gone
+            socket.emit('forceClearStorage'); 
         }
     });
 
@@ -346,17 +394,19 @@ io.on('connection', (socket) => {
             if (game.state.managers[mgrName]) {
                 game.state.managers[mgrName].isOnline = false;
                 
-                // Pause draft timer if the active player leaves
                 if (game.state.activeDraftManager === mgrName && game.state.draftSystem === "Draft" && game.state.auctionStatus === "Active") {
                     pauseDraftTimer(roomId);
                 }
                 io.to(roomId).emit('updateState', game.state);
+                saveGameToRedis(roomId);
             }
             
-            // Reassign host if the host leaves (optional safeguard)
             if (game.state.host === mgrName) {
                 const remainingOnline = Object.keys(game.state.managers).find(name => game.state.managers[name].isOnline);
-                if(remainingOnline) game.state.host = remainingOnline;
+                if(remainingOnline) {
+                    game.state.host = remainingOnline;
+                    saveGameToRedis(roomId);
+                }
             }
         }
         
@@ -372,16 +422,16 @@ io.on('connection', (socket) => {
         if (data.name && !game.state.managers[data.name]) {
             game.state.managers[data.name] = { Formation: data.formation, Budget: 1000000000, Roster: [], Status: "Active", isDraftPassed: false, isOnline: true };
             
-            // Assign Host
             if (!game.state.host) game.state.host = data.name;
             
-            // IMPORTANT: Only map the socket to the FIRST manager they create
+            // Only tie socket to the first registered manager
             if (!socketToManager[socket.id]) {
                 socketToManager[socket.id] = data.name; 
             }
             
             socket.emit('managerRegistered', data.name);
             io.to(roomId).emit('updateState', game.state);
+            saveGameToRedis(roomId);
         }
     });
 
@@ -409,6 +459,7 @@ io.on('connection', (socket) => {
         clearInterval(game.timer);
         
         io.to(roomId).emit('updateState', game.state);
+        saveGameToRedis(roomId);
     });
 
     socket.on('startGame', ({ roomId, mode, system }) => {
@@ -421,8 +472,6 @@ io.on('connection', (socket) => {
         if ((mode.includes("Casual") || mode.includes("Match")) && mgrCount !== 2) {
             return socket.emit('auctionError', "Head-to-head matches require exactly 2 players!");
         }
-        
-        // Updated check: Restrict tournaments to 3-16 players
         if (mode.includes("Tournament") && (mgrCount < 3 || mgrCount > 16)) {
             return socket.emit('auctionError', "Only 3 to 16 players can play.");
         }
@@ -457,6 +506,7 @@ io.on('connection', (socket) => {
             game.state.currentTurnIndex = 0;
             io.to(roomId).emit('updateState', game.state);
         }
+        saveGameToRedis(roomId);
     });
 
     socket.on('submitPlayerEntry', ({ roomId, ...playerData }) => {
@@ -514,6 +564,7 @@ io.on('connection', (socket) => {
             });
             
             io.to(roomId).emit('updateState', game.state);
+            saveGameToRedis(roomId);
             advanceDraftTurn(roomId);
 
         } else {
@@ -523,6 +574,7 @@ io.on('connection', (socket) => {
                 Value: parseInt(rawVal) || 1000000, highestBid: 0, highestBidder: null, timeLeft: 180, passedManagers: []
             };
             io.to(roomId).emit('updateState', game.state);
+            saveGameToRedis(roomId);
 
             clearInterval(game.timer);
             game.timer = setInterval(() => {
@@ -546,6 +598,7 @@ io.on('connection', (socket) => {
         
         mgr.isDraftPassed = isPassing;
         io.to(roomId).emit('updateState', game.state);
+        saveGameToRedis(roomId);
         
         if (isPassing && game.state.activeDraftManager === mgrName) advanceDraftTurn(roomId);
         else checkDraftEnd(roomId);
@@ -599,6 +652,7 @@ io.on('connection', (socket) => {
         if (game && game.state.managers[mgrName] && game.state.managers[mgrName].Roster[playerIndex]) {
             game.state.managers[mgrName].Roster[playerIndex].isStarting = isStarting;
             io.to(roomId).emit('updateState', game.state);
+            saveGameToRedis(roomId);
         }
     });
 
@@ -607,7 +661,7 @@ io.on('connection', (socket) => {
         let game = activeGames[roomId];
         if (!game) return;
         const requester = socketToManager[socket.id];
-        if (game.state.host !== requester) return; // Only host
+        if (game.state.host !== requester) return;
 
         if (game.state.draftSystem === "Draft" && game.state.activeDraftManager) {
             autoDraftPunishment(roomId, game.state.activeDraftManager);
@@ -628,6 +682,7 @@ io.on('connection', (socket) => {
         if (game.state.activeDraftManager === targetName) advanceDraftTurn(roomId);
         
         io.to(roomId).emit('updateState', game.state);
+        saveGameToRedis(roomId);
     });
 });
 
