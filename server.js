@@ -7,6 +7,10 @@ const { Redis } = require('@upstash/redis');
 
 const app = express();
 app.use(cors());
+
+// Health-check endpoint to wake up Render immediately when the frontend loads
+app.get('/ping', (req, res) => res.status(200).send('Server is awake!'));
+
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
@@ -319,16 +323,18 @@ function checkAuctionEndEarly(roomId) {
 io.on('connection', (socket) => {
     
     // --- ROOM CREATION & JOINING ---
-    socket.on('createRoom', async () => {
+    socket.on('createRoom', () => {
         const roomId = Math.random().toString(36).substring(2, 6).toUpperCase(); 
         activeGames[roomId] = { state: createEmptyGameState(), timer: null };
         socket.join(roomId);
         socketToRoom[socket.id] = roomId;
         
-        await saveGameToRedis(roomId);
-
+        // Emit immediately so the room opens instantly on the client
         socket.emit('roomCreated', roomId);
         io.to(roomId).emit('updateState', activeGames[roomId].state);
+
+        // Save to Redis asynchronously in the background
+        saveGameToRedis(roomId);
     });
 
     socket.on('joinRoom', async (roomId) => {

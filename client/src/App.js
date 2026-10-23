@@ -46,6 +46,9 @@ const btnStyle = { padding: '10px 15px', border: 'none', borderRadius: '6px', fo
 function App() {
   const [roomId, setRoomId] = useState(null);
   const [joinCode, setJoinCode] = useState('');
+  const [isServerConnected, setIsServerConnected] = useState(socket.connected);
+  const [isRoomLoading, setIsRoomLoading] = useState(false);
+
   const [gameState, setGameState] = useState({ managers: {}, auctionHistory: [], cardOnBlock: null, turnOrder: [], currentTurnIndex: 0, auctionStatus: "Lobby", bracket: null, draftSystem: "Auction", host: null });
   const [myManagerName, setMyManagerName] = useState('');
   const [timeLeft, setTimeLeft] = useState(0);
@@ -61,13 +64,21 @@ function App() {
   const [pPos, setPPos] = useState('ST');
   const [pAge, setPAge] = useState(25);
   const [pClub, setPClub] = useState('Other League Club');
-  const [customClub, setCustomClub] = useState(''); // New state for custom club entry
+  const [customClub, setCustomClub] = useState('');
   const [pValue, setPValue] = useState("1,000,000");
   const [stats, setStats] = useState({ s1: 80, s2: 80, s3: 80, s4: 80, s5: 80, s6: 80 });
   const [viewRosterMgr, setViewRosterMgr] = useState(null);
   const [managerBids, setManagerBids] = useState({});
 
   useEffect(() => {
+    // 0. Wake up Render immediately & track connection status
+    fetch('https://matchattaxgame.onrender.com/ping').catch(() => {});
+
+    const onConnect = () => setIsServerConnected(true);
+    const onDisconnect = () => setIsServerConnected(false);
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+
     // 1. Silent Reconnect Logic
     const savedRoomId = localStorage.getItem('roomId');
     const savedManagerName = localStorage.getItem('myManagerName');
@@ -78,9 +89,18 @@ function App() {
     }
 
     // 2. Room Events
-    socket.on('roomCreated', (id) => { setRoomId(id); localStorage.setItem('roomId', id); });
-    socket.on('roomJoined', (id) => { setRoomId(id); localStorage.setItem('roomId', id); });
+    socket.on('roomCreated', (id) => { 
+        setIsRoomLoading(false);
+        setRoomId(id); 
+        localStorage.setItem('roomId', id); 
+    });
+    socket.on('roomJoined', (id) => { 
+        setIsRoomLoading(false);
+        setRoomId(id); 
+        localStorage.setItem('roomId', id); 
+    });
     socket.on('forceClearStorage', () => { 
+        setIsRoomLoading(false);
         localStorage.removeItem('roomId'); 
         localStorage.removeItem('myManagerName');
         setRoomId(null); 
@@ -104,9 +124,13 @@ function App() {
         });
     });
     socket.on('timerTick', (time) => setTimeLeft(time));
-    socket.on('auctionError', (msg) => alert("⚠️ " + msg)); 
+    socket.on('auctionError', (msg) => {
+        setIsRoomLoading(false);
+        alert("⚠️ " + msg);
+    }); 
     
     return () => {
+        socket.off('connect', onConnect); socket.off('disconnect', onDisconnect);
         socket.off('roomCreated'); socket.off('roomJoined'); socket.off('forceClearStorage');
         socket.off('updateState'); socket.off('managerRegistered'); socket.off('timerTick'); socket.off('auctionError');
     };
@@ -118,12 +142,10 @@ function App() {
   };
 
   const handlePlayerSubmit = () => {
-    // Determine which club string to send to the server
     const finalClub = pClub === 'Other League Club' && customClub.trim() !== '' ? customClub : pClub;
-    
     socket.emit('submitPlayerEntry', { roomId, name: pName, position: pPos, age: pAge, club: finalClub, value: pValue, stats });
     setPName(''); 
-    setCustomClub(''); // Clear the custom club input after submitting
+    setCustomClub('');
   };
 
   const submitBid = (mgrName) => {
@@ -197,7 +219,6 @@ function App() {
                   {isDarkMode ? '☀️' : '🌙'}
               </button>
               
-              {/* Reset Game Button - Now visible to anyone in the room */}
               {roomId && (
                   <button onClick={() => { 
                       if(window.confirm('Wipe history, rosters, and budgets for this room?')) {
@@ -208,7 +229,6 @@ function App() {
                   </button>
               )}
 
-              {/* Hard Reset / Leave Room Button */}
               {roomId && (
                   <button onClick={() => { 
                       if(window.confirm('Completely wipe your local data and leave this room?')) { 
@@ -231,11 +251,21 @@ function App() {
       {!roomId ? (
         <section style={{ textAlign: 'center', padding: '60px 20px', maxWidth: '600px', margin: '0 auto' }}>
             <h2 style={{ color: theme.accentNeon, fontSize: '2rem', marginBottom: '10px' }}>Join or Create a Match</h2>
-            <p style={{ color: theme.textMuted, marginBottom: '40px' }}>Start a private server for your friends to draft and bid.</p>
+            <p style={{ color: theme.textMuted, marginBottom: '20px' }}>Start a private server for your friends to draft and bid.</p>
             
+            {/* Cold-Start Server Status Banner */}
+            <div style={{ marginBottom: '30px', padding: '10px 15px', borderRadius: '8px', background: isServerConnected ? theme.bgNeonLight : theme.bgGoldLight, border: `1px solid ${isServerConnected ? theme.accentNeon : theme.accentGold}`, color: isServerConnected ? theme.accentNeon : theme.accentGold, fontSize: '13px', fontWeight: 'bold' }}>
+                {isServerConnected 
+                    ? "🟢 Game Server Online — Ready for instant matchmaking!" 
+                    : "⏳ Waking up cloud server... (First load takes ~30s)"}
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
-                <button onClick={() => socket.emit('createRoom')} style={{ ...btnStyle, background: theme.accentNeon, fontSize: '18px', padding: '15px' }}>
-                    🆕 Create New Private Room
+                <button 
+                    disabled={isRoomLoading}
+                    onClick={() => { setIsRoomLoading(true); socket.emit('createRoom'); }} 
+                    style={{ ...btnStyle, background: isRoomLoading ? theme.border : theme.accentNeon, color: isRoomLoading ? theme.textMuted : '#000', fontSize: '18px', padding: '15px', cursor: isRoomLoading ? 'wait' : 'pointer' }}>
+                    {isRoomLoading ? "⏳ Creating Room..." : "🆕 Create New Private Room"}
                 </button>
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -246,8 +276,11 @@ function App() {
 
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <input type="text" placeholder="Enter 4-Digit Room Code" value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} maxLength={4} style={{ ...inputStyleDynamic, fontSize: '18px', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '2px' }} />
-                    <button onClick={() => { if(joinCode.length === 4) socket.emit('joinRoom', joinCode); }} style={{ ...btnStyle, background: theme.bgInput, color: theme.textStrong, border: `1px solid ${theme.border}`, width: '120px' }}>
-                        Join Game
+                    <button 
+                        disabled={isRoomLoading || joinCode.length !== 4}
+                        onClick={() => { if(joinCode.length === 4) { setIsRoomLoading(true); socket.emit('joinRoom', joinCode); } }} 
+                        style={{ ...btnStyle, background: theme.bgInput, color: theme.textStrong, border: `1px solid ${theme.border}`, width: '120px', opacity: joinCode.length === 4 ? 1 : 0.5 }}>
+                        {isRoomLoading ? "Joining..." : "Join Game"}
                     </button>
                 </div>
             </div>
@@ -461,9 +494,8 @@ function App() {
                     ))}
                   </select>
 
-                  {/* Conditional input for custom club name */}
                   {pClub === 'Other League Club' && (
-                      <input type="text" placeholder="Enter Custom Club Name (e.g., Inter Miami)" value={customClub} onChange={(e) => setCustomClub(e.target.value)} style={inputStyleDynamic} />
+                      <input type="text" placeholder="Enter Custom Club Name (e.g., Al Nassr)" value={customClub} onChange={(e) => setCustomClub(e.target.value)} style={inputStyleDynamic} />
                   )}
 
                   {!isDraftMode && <input type="text" placeholder="Transfermarkt Price (€)" value={pValue} onChange={(e) => setPValue(formatCurrency(e.target.value))} style={inputStyleDynamic} />}
